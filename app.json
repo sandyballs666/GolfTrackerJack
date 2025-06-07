@@ -11,8 +11,6 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSBluetoothAlwaysUsageDescription": "This app uses Bluetooth to track golf balls and nearby devices on the course.",
-        "NSBluetoothPeripheralUsageDescription": "This app uses Bluetooth to track golf balls and nearby devices on the course.",
         "NSLocationWhenInUseUsageDescription": "This app uses location to calculate distances to tracked devices and provide navigation."
       }
     },
@@ -22,10 +20,6 @@
         "backgroundColor": "#ffffff"
       },
       "permissions": [
-        "android.permission.BLUETOOTH",
-        "android.permission.BLUETOOTH_ADMIN",
-        "android.permission.BLUETOOTH_CONNECT",
-        "android.permission.BLUETOOTH_SCAN",
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION"
       ]
@@ -39,15 +33,7 @@
       "expo-router", 
       "expo-font", 
       "expo-web-browser",
-      "expo-location",
-      [
-        "react-native-ble-manager",
-        {
-          "isBackgroundEnabled": true,
-          "modes": ["peripheral", "central"],
-          "bluetoothAlwaysPermission": "This app uses Bluetooth to track golf balls and nearby devices on the course."
-        }
-      ]
+      "expo-location"
     ],
     "experiments": {
       "typedRoutes": true
