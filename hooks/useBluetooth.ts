@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Platform, Alert } from 'react-native';
+import { Platform, PermissionsAndroid, Alert } from 'react-native';
 
 export interface BluetoothDevice {
   id: string;
@@ -16,21 +16,83 @@ export function useBluetooth() {
   const [isScanning, setIsScanning] = useState(false);
   const [devices, setDevices] = useState<BluetoothDevice[]>([]);
   const [isBluetoothEnabled, setIsBluetoothEnabled] = useState(false);
+  const [bleManager, setBleManager] = useState<any>(null);
   const [scanError, setScanError] = useState<string | null>(null);
 
   useEffect(() => {
-    checkPlatformSupport();
+    initializeBluetooth();
   }, []);
 
-  const checkPlatformSupport = () => {
-    if (Platform.OS === 'web') {
-      setScanError('Bluetooth scanning requires a native mobile app');
-      setIsBluetoothEnabled(false);
-    } else {
-      // Check if we're in Expo Go or development build
-      setScanError('Real Bluetooth requires a development build with native modules');
+  const initializeBluetooth = async () => {
+    try {
+      // Import BLE Manager
+      const BleManager = require('react-native-ble-manager');
+      
+      // Initialize BLE Manager
+      await BleManager.start({ showAlert: false });
+      setBleManager(BleManager);
+      
+      // Check initial Bluetooth state
+      const isEnabled = await BleManager.checkState();
+      setIsBluetoothEnabled(isEnabled === 'on');
+      setScanError(null);
+      
+      console.log('✅ Bluetooth initialized successfully');
+      
+    } catch (error) {
+      console.error('❌ Bluetooth initialization failed:', error);
+      setScanError('Bluetooth not available on this device');
       setIsBluetoothEnabled(false);
     }
+  };
+
+  const requestPermissions = async (): Promise<boolean> => {
+    if (Platform.OS === 'web') {
+      setScanError('Bluetooth scanning not available on web platform');
+      return false;
+    }
+
+    if (Platform.OS === 'android') {
+      try {
+        const permissions = [
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
+        ];
+
+        // Add Bluetooth permissions for Android 12+
+        if (Platform.Version >= 31) {
+          permissions.push(
+            PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+            PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+            PermissionsAndroid.PERMISSIONS.BLUETOOTH_ADVERTISE
+          );
+        }
+
+        const granted = await PermissionsAndroid.requestMultiple(permissions);
+
+        const allGranted = Object.values(granted).every(
+          permission => permission === PermissionsAndroid.RESULTS.GRANTED
+        );
+
+        if (!allGranted) {
+          setScanError('Bluetooth and location permissions are required');
+          Alert.alert(
+            'Permissions Required',
+            'Bluetooth and location permissions are required to scan for nearby devices like golf balls, phones, and accessories.',
+            [{ text: 'OK' }]
+          );
+        }
+
+        return allGranted;
+      } catch (error) {
+        console.error('Permission request error:', error);
+        setScanError('Failed to request permissions');
+        return false;
+      }
+    }
+
+    // iOS permissions are handled automatically by the system
+    return true;
   };
 
   const startScan = async (): Promise<void> => {
@@ -38,109 +100,118 @@ export function useBluetooth() {
 
     setScanError(null);
 
-    if (Platform.OS === 'web') {
-      setScanError('Bluetooth scanning not available on web platform');
+    if (!bleManager) {
+      setScanError('Bluetooth not initialized');
+      return;
+    }
+
+    if (!isBluetoothEnabled) {
+      setScanError('Please enable Bluetooth to scan for devices');
       Alert.alert(
-        'Platform Not Supported',
-        'Bluetooth scanning is not available on web browsers. Please use the mobile app on iOS or Android.',
+        'Bluetooth Required',
+        'Please enable Bluetooth in your device settings to scan for nearby devices.',
         [{ text: 'OK' }]
       );
       return;
     }
 
-    // Show development build requirement message
-    Alert.alert(
-      'Development Build Required',
-      'Real Bluetooth scanning requires a development build with native modules.\n\nTo enable Bluetooth:\n\n1. Run: npx create-expo-app --template\n2. Add react-native-ble-manager\n3. Create development build with EAS\n4. Install on device\n\nFor now, this shows demo devices.',
-      [
-        { text: 'Learn More', onPress: () => {
-          Alert.alert(
-            'How to Enable Real Bluetooth',
-            'Steps to get real Bluetooth working:\n\n1. Exit Expo Go\n2. Run: npx create-expo-app MyGolfApp\n3. Add: npx expo install react-native-ble-manager\n4. Configure permissions in app.json\n5. Run: npx eas build --profile development\n6. Install the .apk/.ipa on your device\n\nThen Bluetooth will work with real devices!',
-            [{ text: 'Got it!' }]
-          );
-        }},
-        { text: 'Show Demo', onPress: () => simulateDeviceDiscovery() }
-      ]
-    );
-  };
+    const hasPermissions = await requestPermissions();
+    if (!hasPermissions) {
+      return;
+    }
 
-  const simulateDeviceDiscovery = () => {
     setIsScanning(true);
     setDevices([]);
-    setScanError(null);
 
-    const demoDevices: BluetoothDevice[] = [
-      {
-        id: 'demo-phone-1',
-        name: 'iPhone 15 Pro',
-        rssi: -42,
-      },
-      {
-        id: 'demo-watch-1',
-        name: 'Apple Watch Series 9',
-        rssi: -55,
-      },
-      {
-        id: 'demo-headphones-1',
-        name: 'AirPods Pro',
-        rssi: -38,
-      },
-      {
-        id: 'demo-phone-2',
-        name: 'Galaxy S24 Ultra',
-        rssi: -52,
-      },
-      {
-        id: 'demo-headphones-2',
-        name: 'Sony WH-1000XM5',
-        rssi: -48,
-      },
-      {
-        id: 'demo-watch-2',
-        name: 'Garmin Approach S70',
-        rssi: -61,
-      },
-      {
-        id: 'demo-golf-1',
-        name: 'Smart Golf Ball Pro',
-        rssi: -67,
-      },
-      {
-        id: 'demo-golf-2',
-        name: 'Titleist Smart Ball',
-        rssi: -58,
-      },
-    ];
+    try {
+      console.log('🔍 Starting real Bluetooth scan...');
+      
+      // Start scanning for all devices
+      await bleManager.scan([], 15, true); // Scan for 15 seconds, allow duplicates
+      
+      // Set up device discovery listener
+      const deviceDiscoveryListener = (device: any) => {
+        if (device && device.id && device.name) {
+          const newDevice: BluetoothDevice = {
+            id: device.id,
+            name: device.name || 'Unknown Device',
+            rssi: device.rssi || -100,
+            advertising: device.advertising,
+          };
+          
+          setDevices(prev => {
+            // Update existing device or add new one
+            const existingIndex = prev.findIndex(d => d.id === device.id);
+            if (existingIndex >= 0) {
+              const updated = [...prev];
+              updated[existingIndex] = newDevice;
+              return updated;
+            }
+            console.log(`📱 Discovered: ${newDevice.name} (${newDevice.rssi}dBm)`);
+            return [...prev, newDevice];
+          });
+        }
+      };
 
-    // Simulate gradual discovery
-    demoDevices.forEach((device, index) => {
+      // Add event listeners
+      bleManager.addListener('BleManagerDiscoverPeripheral', deviceDiscoveryListener);
+      
+      // Set up scan stop listener
+      const scanStopListener = () => {
+        console.log('⏹️ Bluetooth scan completed');
+        setIsScanning(false);
+        bleManager.removeListener('BleManagerDiscoverPeripheral', deviceDiscoveryListener);
+        bleManager.removeListener('BleManagerStopScan', scanStopListener);
+      };
+      
+      bleManager.addListener('BleManagerStopScan', scanStopListener);
+      
+      // Auto-stop scanning after timeout
       setTimeout(() => {
-        setDevices(prev => {
-          if (prev.find(d => d.id === device.id)) {
-            return prev;
-          }
-          console.log(`📱 Demo discovered: ${device.name}`);
-          return [...prev, device];
-        });
-      }, (index + 1) * 800);
-    });
-
-    // Stop scanning after all devices are discovered
-    setTimeout(() => {
+        if (isScanning) {
+          stopScan();
+        }
+      }, 15000);
+      
+    } catch (error) {
+      console.error('Bluetooth scan error:', error);
+      setScanError('Failed to start Bluetooth scan');
       setIsScanning(false);
-      console.log('✅ Demo scan completed');
-    }, demoDevices.length * 800 + 1000);
+      
+      Alert.alert(
+        'Scan Error',
+        'Failed to start Bluetooth scan. Please check your Bluetooth settings and try again.',
+        [{ text: 'OK' }]
+      );
+    }
   };
 
   const stopScan = async (): Promise<void> => {
+    if (!isScanning || !bleManager) return;
+    
+    try {
+      await bleManager.stopScan();
+      console.log('⏹️ Bluetooth scan stopped manually');
+    } catch (error) {
+      console.error('Stop scan error:', error);
+    }
+    
     setIsScanning(false);
-    console.log('⏹️ Scan stopped');
   };
 
   const checkBluetoothState = async () => {
-    // For demo purposes, always return false since we don't have real Bluetooth
-    setIsBluetoothEnabled(false);
+    if (!bleManager) {
+      setIsBluetoothEnabled(false);
+      return;
+    }
+
+    try {
+      const state = await bleManager.checkState();
+      setIsBluetoothEnabled(state === 'on');
+    } catch (error) {
+      console.error('Bluetooth state check error:', error);
+      setIsBluetoothEnabled(false);
+    }
   };
 
   return {
