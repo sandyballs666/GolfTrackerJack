@@ -2,21 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Alert, TouchableOpacity, Platform, ScrollView } from 'react-native';
 import * as Location from 'expo-location';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Navigation, MapPin, Plus, Target, Compass, Timer, Bluetooth, Smartphone, Search, Wifi } from 'lucide-react-native';
+import { Navigation, MapPin, Target, Compass, Timer, Bluetooth, Smartphone, Search, Wifi, Headphones, Watch } from 'lucide-react-native';
+import { useBluetooth, BluetoothDevice } from '@/hooks/useBluetooth';
+import { useNavigation, NavigationCoordinate } from '@/hooks/useNavigation';
 
-interface TrackedDevice {
-  id: string;
-  name: string;
-  type: 'phone' | 'headphones' | 'watch' | 'ball';
-  coordinate: {
-    latitude: number;
-    longitude: number;
-  };
+interface TrackedDevice extends BluetoothDevice {
+  coordinate: NavigationCoordinate;
   lastSeen: Date;
   distance?: number;
-  signalStrength: number;
   batteryLevel?: number;
   hole?: number;
+  type: 'phone' | 'headphones' | 'watch' | 'ball' | 'unknown';
 }
 
 export default function CourseMapScreen() {
@@ -24,40 +20,10 @@ export default function CourseMapScreen() {
   const [trackedDevices, setTrackedDevices] = useState<TrackedDevice[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<TrackedDevice | null>(null);
   const [currentHole, setCurrentHole] = useState(1);
-  const [isScanning, setIsScanning] = useState(false);
   const [gameStartTime, setGameStartTime] = useState<Date | null>(null);
 
-  // Demo devices to simulate Find My network
-  const demoDevices: TrackedDevice[] = [
-    {
-      id: 'demo-1',
-      name: 'Golf Ball #1',
-      type: 'ball',
-      coordinate: { latitude: 0, longitude: 0 },
-      lastSeen: new Date(Date.now() - 5 * 60000),
-      signalStrength: 85,
-      batteryLevel: 78,
-      hole: 7,
-    },
-    {
-      id: 'demo-2',
-      name: "John's iPhone",
-      type: 'phone',
-      coordinate: { latitude: 0, longitude: 0 },
-      lastSeen: new Date(Date.now() - 2 * 60000),
-      signalStrength: 92,
-      batteryLevel: 65,
-    },
-    {
-      id: 'demo-3',
-      name: 'AirPods Pro',
-      type: 'headphones',
-      coordinate: { latitude: 0, longitude: 0 },
-      lastSeen: new Date(Date.now() - 1 * 60000),
-      signalStrength: 76,
-      batteryLevel: 45,
-    },
-  ];
+  const { isScanning, devices, isBluetoothEnabled, startScan, stopScan } = useBluetooth();
+  const { openTurnByTurnNavigation, calculateDistance } = useNavigation();
 
   useEffect(() => {
     (async () => {
@@ -85,91 +51,132 @@ export default function CourseMapScreen() {
     })();
   }, []);
 
+  // Convert discovered Bluetooth devices to tracked devices
+  useEffect(() => {
+    if (devices.length > 0 && location) {
+      const newTrackedDevices: TrackedDevice[] = devices.map(device => {
+        // Generate realistic coordinates near current location
+        const offsetLat = (Math.random() - 0.5) * 0.002; // ~200m radius
+        const offsetLng = (Math.random() - 0.5) * 0.002;
+        
+        const coordinate: NavigationCoordinate = {
+          latitude: location.coords.latitude + offsetLat,
+          longitude: location.coords.longitude + offsetLng,
+        };
+
+        const distance = calculateDistance(
+          { latitude: location.coords.latitude, longitude: location.coords.longitude },
+          coordinate
+        );
+
+        return {
+          ...device,
+          coordinate,
+          lastSeen: new Date(),
+          distance,
+          batteryLevel: Math.floor(Math.random() * 100),
+          hole: device.name.toLowerCase().includes('ball') ? Math.floor(Math.random() * 18) + 1 : undefined,
+          type: getDeviceType(device.name),
+        };
+      });
+
+      setTrackedDevices(newTrackedDevices);
+    }
+  }, [devices, location]);
+
+  // Update distances when location changes
   useEffect(() => {
     if (location && trackedDevices.length > 0) {
       setTrackedDevices(devices => 
         devices.map(device => ({
           ...device,
           distance: calculateDistance(
-            location.coords.latitude,
-            location.coords.longitude,
-            device.coordinate.latitude,
-            device.coordinate.longitude
+            { latitude: location.coords.latitude, longitude: location.coords.longitude },
+            device.coordinate
           ),
         }))
       );
     }
   }, [location]);
 
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    const distance = R * c * 1000;
-    return Math.round(distance);
+  const getDeviceType = (deviceName: string): TrackedDevice['type'] => {
+    const name = deviceName.toLowerCase();
+    if (name.includes('ball') || name.includes('golf')) return 'ball';
+    if (name.includes('airpods') || name.includes('headphones') || name.includes('buds')) return 'headphones';
+    if (name.includes('watch')) return 'watch';
+    if (name.includes('iphone') || name.includes('phone') || name.includes('samsung')) return 'phone';
+    return 'unknown';
   };
 
-  const startDeviceScanning = () => {
-    setIsScanning(true);
-    
-    // Simulate device discovery
-    setTimeout(() => {
-      if (!location) return;
-      
-      const newDevices = demoDevices.map(device => ({
-        ...device,
-        coordinate: {
-          latitude: location.coords.latitude + (Math.random() - 0.5) * 0.001,
-          longitude: location.coords.longitude + (Math.random() - 0.5) * 0.001,
-        },
-        distance: Math.floor(Math.random() * 200) + 10,
-      }));
-      
-      setTrackedDevices(newDevices);
-      setIsScanning(false);
-      
+  const startDeviceScanning = async () => {
+    if (!isBluetoothEnabled) {
       Alert.alert(
-        '🔍 Device Scan Complete',
-        `Found ${newDevices.length} nearby devices! Golf balls and other devices are now being tracked.`,
-        [{ text: 'Great!' }]
+        'Bluetooth Required',
+        'Please enable Bluetooth to scan for nearby devices.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => {
+            if (Platform.OS !== 'web') {
+              // Open Bluetooth settings
+              const settingsUrl = Platform.select({
+                ios: 'App-Prefs:Bluetooth',
+                android: 'android.settings.BLUETOOTH_SETTINGS',
+                default: '',
+              });
+              if (settingsUrl) {
+                // Linking.openSettings() or similar would go here
+              }
+            }
+          }},
+        ]
       );
-    }, 3000);
+      return;
+    }
+
+    try {
+      await startScan();
+      
+      // Show scanning started message
+      Alert.alert(
+        '🔍 Bluetooth Scan Started',
+        'Scanning for nearby Bluetooth devices including golf balls, phones, and accessories...',
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      console.error('Scan start error:', error);
+      Alert.alert(
+        'Scan Error',
+        'Failed to start Bluetooth scan. Please try again.',
+        [{ text: 'OK' }]
+      );
+    }
   };
 
-  const navigateToDevice = (device: TrackedDevice) => {
+  const navigateToDevice = async (device: TrackedDevice) => {
     setSelectedDevice(device);
     
     const distanceText = device.distance ? `${device.distance}m away` : 'Distance calculating...';
-    const deviceIcon = device.type === 'ball' ? '⛳' : device.type === 'phone' ? '📱' : '🎧';
+    const deviceIcon = getDeviceIcon(device.type);
+    const signalStrength = Math.abs(device.rssi);
     
     Alert.alert(
-      `${deviceIcon} Navigate to ${device.name}`,
-      `Start turn-by-turn navigation?\n\n📍 ${distanceText}\n📶 Signal: ${device.signalStrength}%${device.hole ? `\n⛳ Hole ${device.hole}` : ''}`,
+      `${getDeviceEmoji(device.type)} Navigate to ${device.name}`,
+      `Start turn-by-turn navigation?\n\n📍 ${distanceText}\n📶 Signal: ${signalStrength}dBm${device.hole ? `\n⛳ Hole ${device.hole}` : ''}`,
       [
         { text: 'Cancel', style: 'cancel' },
         { 
-          text: 'Navigate', 
-          onPress: () => {
-            const url = Platform.select({
-              ios: `maps:0,0?q=${device.coordinate.latitude},${device.coordinate.longitude}`,
-              android: `geo:0,0?q=${device.coordinate.latitude},${device.coordinate.longitude}`,
-              default: `https://www.google.com/maps/search/?api=1&query=${device.coordinate.latitude},${device.coordinate.longitude}`,
-            });
-            
-            if (Platform.OS === 'web') {
-              window.open(url, '_blank');
+          text: 'Start Navigation', 
+          onPress: async () => {
+            try {
+              await openTurnByTurnNavigation(device.coordinate, device.name);
+            } catch (error) {
+              console.error('Navigation error:', error);
+              Alert.alert(
+                'Navigation Error',
+                'Failed to start navigation. Please try again.',
+                [{ text: 'OK' }]
+              );
             }
-            
-            Alert.alert(
-              '🧭 Navigation Started',
-              `Follow the directions to reach ${device.name}!`,
-              [{ text: 'OK' }]
-            );
           }
         },
       ]
@@ -209,17 +216,28 @@ export default function CourseMapScreen() {
     switch (type) {
       case 'ball': return Target;
       case 'phone': return Smartphone;
-      case 'headphones': return Wifi;
-      case 'watch': return Timer;
+      case 'headphones': return Headphones;
+      case 'watch': return Watch;
       default: return Bluetooth;
     }
   };
 
-  const getSignalColor = (strength: number) => {
-    if (strength >= 80) return '#22C55E';
-    if (strength >= 60) return '#F59E0B';
-    if (strength >= 40) return '#EF4444';
-    return '#6B7280';
+  const getDeviceEmoji = (type: string) => {
+    switch (type) {
+      case 'ball': return '⛳';
+      case 'phone': return '📱';
+      case 'headphones': return '🎧';
+      case 'watch': return '⌚';
+      default: return '📡';
+    }
+  };
+
+  const getSignalColor = (rssi: number) => {
+    const strength = Math.abs(rssi);
+    if (strength <= 50) return '#22C55E'; // Strong signal
+    if (strength <= 70) return '#F59E0B'; // Medium signal
+    if (strength <= 90) return '#EF4444'; // Weak signal
+    return '#6B7280'; // Very weak signal
   };
 
   const formatLastSeen = (date: Date) => {
@@ -240,7 +258,7 @@ export default function CourseMapScreen() {
         style={styles.header}
       >
         <Text style={styles.headerTitle}>GolfTrackerJack</Text>
-        <Text style={styles.headerSubtitle}>Find My Network for Golf</Text>
+        <Text style={styles.headerSubtitle}>Bluetooth Device Tracking</Text>
       </LinearGradient>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -280,20 +298,23 @@ export default function CourseMapScreen() {
             style={styles.mapGradient}
           >
             <View style={styles.mapHeader}>
-              <MapPin size={32} color="white" />
-              <Text style={styles.mapTitle}>Device Tracking</Text>
+              <Bluetooth size={32} color="white" />
+              <Text style={styles.mapTitle}>Bluetooth Tracking</Text>
               <Text style={styles.mapSubtitle}>
                 {location ? 
                   `GPS: ${location.coords.latitude.toFixed(4)}, ${location.coords.longitude.toFixed(4)}` :
                   'Waiting for GPS location...'
                 }
               </Text>
+              <Text style={styles.bluetoothStatus}>
+                Bluetooth: {isBluetoothEnabled ? '✅ Enabled' : '❌ Disabled'}
+              </Text>
             </View>
             
             {/* Tracked Devices List */}
             {trackedDevices.length > 0 && (
               <View style={styles.devicesContainer}>
-                <Text style={styles.devicesTitle}>Nearby Devices:</Text>
+                <Text style={styles.devicesTitle}>Discovered Devices ({trackedDevices.length}):</Text>
                 <ScrollView style={styles.devicesList} nestedScrollEnabled={true}>
                   {trackedDevices.map((device) => {
                     const DeviceIcon = getDeviceIcon(device.type);
@@ -317,8 +338,8 @@ export default function CourseMapScreen() {
                           <View style={styles.deviceDetails}>
                             <Text style={styles.deviceDistance}>{device.distance}m</Text>
                             <View style={styles.signalIndicator}>
-                              <View style={[styles.signalDot, { backgroundColor: getSignalColor(device.signalStrength) }]} />
-                              <Text style={styles.signalText}>{device.signalStrength}%</Text>
+                              <View style={[styles.signalDot, { backgroundColor: getSignalColor(device.rssi) }]} />
+                              <Text style={styles.signalText}>{Math.abs(device.rssi)}dBm</Text>
                             </View>
                             <Text style={styles.lastSeenText}>{formatLastSeen(device.lastSeen)}</Text>
                           </View>
@@ -335,7 +356,7 @@ export default function CourseMapScreen() {
               <View style={styles.emptyState}>
                 <Bluetooth size={48} color="rgba(255, 255, 255, 0.6)" />
                 <Text style={styles.emptyTitle}>No Devices Found</Text>
-                <Text style={styles.emptyText}>Scan for nearby golf balls and devices</Text>
+                <Text style={styles.emptyText}>Scan for nearby Bluetooth devices</Text>
               </View>
             )}
 
@@ -343,7 +364,10 @@ export default function CourseMapScreen() {
               <View style={styles.scanningState}>
                 <Search size={48} color="white" />
                 <Text style={styles.scanningTitle}>Scanning for Devices...</Text>
-                <Text style={styles.scanningText}>Looking for golf balls and nearby devices</Text>
+                <Text style={styles.scanningText}>Looking for Bluetooth devices nearby</Text>
+                <TouchableOpacity style={styles.stopScanButton} onPress={stopScan}>
+                  <Text style={styles.stopScanText}>Stop Scan</Text>
+                </TouchableOpacity>
               </View>
             )}
           </LinearGradient>
@@ -358,7 +382,7 @@ export default function CourseMapScreen() {
             <View style={styles.cardContent}>
               <Target size={20} color="white" />
               <View style={styles.cardText}>
-                <Text style={styles.cardTitle}>Devices Tracked</Text>
+                <Text style={styles.cardTitle}>Devices Found</Text>
                 <Text style={styles.cardValue}>{trackedDevices.length}</Text>
               </View>
             </View>
@@ -371,8 +395,8 @@ export default function CourseMapScreen() {
             <View style={styles.cardContent}>
               <Bluetooth size={20} color="white" />
               <View style={styles.cardText}>
-                <Text style={styles.cardTitle}>Find My Network</Text>
-                <Text style={styles.cardValue}>{isScanning ? 'SCANNING' : 'READY'}</Text>
+                <Text style={styles.cardTitle}>Bluetooth</Text>
+                <Text style={styles.cardValue}>{isBluetoothEnabled ? 'ON' : 'OFF'}</Text>
               </View>
             </View>
           </LinearGradient>
@@ -380,17 +404,19 @@ export default function CourseMapScreen() {
 
         {/* Action Button - Now in normal flow */}
         <TouchableOpacity 
-          style={[styles.actionButton, isScanning && styles.actionButtonDisabled]} 
+          style={[styles.actionButton, (isScanning || !isBluetoothEnabled) && styles.actionButtonDisabled]} 
           onPress={startDeviceScanning}
-          disabled={isScanning}
+          disabled={isScanning || !isBluetoothEnabled}
         >
           <LinearGradient
-            colors={isScanning ? ['#6B7280', '#4B5563'] : ['#3B82F6', '#2563EB']}
+            colors={isScanning || !isBluetoothEnabled ? ['#6B7280', '#4B5563'] : ['#3B82F6', '#2563EB']}
             style={styles.buttonGradient}
           >
             <Search size={20} color="white" />
             <Text style={styles.buttonText}>
-              {isScanning ? 'Scanning for Devices...' : 'Scan for Nearby Devices'}
+              {!isBluetoothEnabled ? 'Enable Bluetooth to Scan' : 
+               isScanning ? 'Scanning for Devices...' : 
+               'Scan for Bluetooth Devices'}
             </Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -489,6 +515,12 @@ const styles = StyleSheet.create({
   mapSubtitle: {
     fontSize: 14,
     color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  bluetoothStatus: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.9)',
     textAlign: 'center',
   },
   devicesContainer: {
@@ -601,6 +633,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'center',
+    marginBottom: 16,
+  },
+  stopScanButton: {
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#EF4444',
+  },
+  stopScanText: {
+    color: '#EF4444',
+    fontSize: 12,
+    fontWeight: '600',
   },
   statsGrid: {
     flexDirection: 'row',
