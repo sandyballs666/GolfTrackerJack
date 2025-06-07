@@ -22,7 +22,7 @@ export default function CourseMapScreen() {
   const [currentHole, setCurrentHole] = useState(1);
   const [gameStartTime, setGameStartTime] = useState<Date | null>(null);
 
-  const { isScanning, devices, isBluetoothEnabled, startScan, stopScan } = useBluetooth();
+  const { isScanning, devices, isBluetoothEnabled, startScan, stopScan, useDemoMode } = useBluetooth();
   const { openTurnByTurnNavigation, calculateDistance } = useNavigation();
 
   useEffect(() => {
@@ -137,16 +137,17 @@ export default function CourseMapScreen() {
       await startScan();
       
       // Show scanning started message
+      const modeText = useDemoMode ? ' (Demo Mode)' : '';
       Alert.alert(
         '🔍 Bluetooth Scan Started',
-        'Scanning for nearby Bluetooth devices including golf balls, phones, and accessories...',
+        `Scanning for nearby Bluetooth devices including golf balls, phones, and accessories...${modeText}`,
         [{ text: 'OK' }]
       );
     } catch (error) {
       console.error('Scan start error:', error);
       Alert.alert(
         'Scan Error',
-        'Failed to start Bluetooth scan. Please try again.',
+        'Failed to start Bluetooth scan. Using demo mode instead.',
         [{ text: 'OK' }]
       );
     }
@@ -258,7 +259,9 @@ export default function CourseMapScreen() {
         style={styles.header}
       >
         <Text style={styles.headerTitle}>GolfTrackerJack</Text>
-        <Text style={styles.headerSubtitle}>Bluetooth Device Tracking</Text>
+        <Text style={styles.headerSubtitle}>
+          Bluetooth Device Tracking {useDemoMode && '(Demo Mode)'}
+        </Text>
       </LinearGradient>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -308,6 +311,7 @@ export default function CourseMapScreen() {
               </Text>
               <Text style={styles.bluetoothStatus}>
                 Bluetooth: {isBluetoothEnabled ? '✅ Enabled' : '❌ Disabled'}
+                {useDemoMode && ' • Demo Mode Active'}
               </Text>
             </View>
             
@@ -356,7 +360,9 @@ export default function CourseMapScreen() {
               <View style={styles.emptyState}>
                 <Bluetooth size={48} color="rgba(255, 255, 255, 0.6)" />
                 <Text style={styles.emptyTitle}>No Devices Found</Text>
-                <Text style={styles.emptyText}>Scan for nearby Bluetooth devices</Text>
+                <Text style={styles.emptyText}>
+                  {useDemoMode ? 'Tap scan to see demo devices' : 'Scan for nearby Bluetooth devices'}
+                </Text>
               </View>
             )}
 
@@ -364,7 +370,9 @@ export default function CourseMapScreen() {
               <View style={styles.scanningState}>
                 <Search size={48} color="white" />
                 <Text style={styles.scanningTitle}>Scanning for Devices...</Text>
-                <Text style={styles.scanningText}>Looking for Bluetooth devices nearby</Text>
+                <Text style={styles.scanningText}>
+                  {useDemoMode ? 'Discovering demo devices...' : 'Looking for Bluetooth devices nearby'}
+                </Text>
                 <TouchableOpacity style={styles.stopScanButton} onPress={stopScan}>
                   <Text style={styles.stopScanText}>Stop Scan</Text>
                 </TouchableOpacity>
@@ -395,8 +403,8 @@ export default function CourseMapScreen() {
             <View style={styles.cardContent}>
               <Bluetooth size={20} color="white" />
               <View style={styles.cardText}>
-                <Text style={styles.cardTitle}>Bluetooth</Text>
-                <Text style={styles.cardValue}>{isBluetoothEnabled ? 'ON' : 'OFF'}</Text>
+                <Text style={styles.cardTitle}>Mode</Text>
+                <Text style={styles.cardValue}>{useDemoMode ? 'DEMO' : 'LIVE'}</Text>
               </View>
             </View>
           </LinearGradient>
@@ -404,18 +412,18 @@ export default function CourseMapScreen() {
 
         {/* Action Button - Now in normal flow */}
         <TouchableOpacity 
-          style={[styles.actionButton, (isScanning || !isBluetoothEnabled) && styles.actionButtonDisabled]} 
+          style={[styles.actionButton, isScanning && styles.actionButtonDisabled]} 
           onPress={startDeviceScanning}
-          disabled={isScanning || !isBluetoothEnabled}
+          disabled={isScanning}
         >
           <LinearGradient
-            colors={isScanning || !isBluetoothEnabled ? ['#6B7280', '#4B5563'] : ['#3B82F6', '#2563EB']}
+            colors={isScanning ? ['#6B7280', '#4B5563'] : ['#3B82F6', '#2563EB']}
             style={styles.buttonGradient}
           >
             <Search size={20} color="white" />
             <Text style={styles.buttonText}>
-              {!isBluetoothEnabled ? 'Enable Bluetooth to Scan' : 
-               isScanning ? 'Scanning for Devices...' : 
+              {isScanning ? 'Scanning for Devices...' : 
+               useDemoMode ? 'Scan for Demo Devices' :
                'Scan for Bluetooth Devices'}
             </Text>
           </LinearGradient>

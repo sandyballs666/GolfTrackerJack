@@ -16,7 +16,7 @@ export function useBluetooth() {
   const [isScanning, setIsScanning] = useState(false);
   const [devices, setDevices] = useState<BluetoothDevice[]>([]);
   const [isBluetoothEnabled, setIsBluetoothEnabled] = useState(false);
-  const [bleManagerReady, setBleManagerReady] = useState(false);
+  const [useDemoMode, setUseDemoMode] = useState(false);
 
   useEffect(() => {
     initializeBluetooth();
@@ -29,66 +29,88 @@ export function useBluetooth() {
   }, []);
 
   const initializeBluetooth = async () => {
+    // Always start with demo mode enabled for safety
+    setUseDemoMode(true);
+    setIsBluetoothEnabled(true);
+
     if (Platform.OS === 'web') {
-      // Web Bluetooth API fallback
-      setIsBluetoothEnabled(!!navigator.bluetooth);
-      setBleManagerReady(true);
+      // Web Bluetooth API check
+      if (navigator.bluetooth) {
+        setIsBluetoothEnabled(true);
+      }
       return;
     }
 
+    // For native platforms, try to check if BLE is available without initializing
     try {
-      // Dynamic import to avoid issues if the library isn't available
-      const BleManager = await import('react-native-ble-manager').then(module => module.default);
+      // Check if the module exists without importing it
+      const hasBluetoothModule = await checkBluetoothModuleAvailability();
       
-      if (!BleManager) {
-        console.log('BLE Manager not available, using demo mode');
-        setIsBluetoothEnabled(true);
-        setBleManagerReady(true);
-        return;
+      if (hasBluetoothModule) {
+        console.log('Bluetooth module available, attempting initialization...');
+        await initializeNativeBluetooth();
+      } else {
+        console.log('Bluetooth module not available, using demo mode');
       }
-
-      // Initialize BLE Manager for native platforms
-      await BleManager.start({ showAlert: false });
-      console.log('BLE Manager initialized successfully');
-      setBleManagerReady(true);
-      
-      // Check initial Bluetooth state
-      await checkBluetoothState();
-      
     } catch (error) {
-      console.error('BLE Manager initialization error:', error);
-      // Fallback to demo mode if BLE Manager fails
-      console.log('Falling back to demo mode');
-      setIsBluetoothEnabled(true);
-      setBleManagerReady(true);
+      console.log('Bluetooth initialization failed, using demo mode:', error);
+      // Keep demo mode enabled
     }
   };
 
-  const checkBluetoothState = async () => {
-    if (Platform.OS === 'web') {
-      setIsBluetoothEnabled(!!navigator.bluetooth);
-      return;
-    }
-
-    if (!bleManagerReady) {
-      setIsBluetoothEnabled(true); // Assume enabled for demo mode
-      return;
-    }
-
+  const checkBluetoothModuleAvailability = async (): Promise<boolean> => {
     try {
-      const BleManager = await import('react-native-ble-manager').then(module => module.default);
+      // Try to resolve the module without importing it
+      const moduleExists = await new Promise((resolve) => {
+        try {
+          require.resolve('react-native-ble-manager');
+          resolve(true);
+        } catch {
+          resolve(false);
+        }
+      });
+      return moduleExists as boolean;
+    } catch {
+      return false;
+    }
+  };
+
+  const initializeNativeBluetooth = async () => {
+    try {
+      // Only import if we're sure the module exists
+      const BleManagerModule = require('react-native-ble-manager');
+      const BleManager = BleManagerModule.default || BleManagerModule;
+      
+      if (!BleManager || typeof BleManager.start !== 'function') {
+        throw new Error('BLE Manager not properly available');
+      }
+
+      // Try to start BLE Manager with timeout
+      const initPromise = BleManager.start({ showAlert: false });
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('BLE initialization timeout')), 5000)
+      );
+
+      await Promise.race([initPromise, timeoutPromise]);
+      
+      console.log('BLE Manager initialized successfully');
+      setUseDemoMode(false); // Disable demo mode if real BLE works
+      
+      // Check Bluetooth state
       const state = await BleManager.checkState();
       setIsBluetoothEnabled(state === 'on');
+      
     } catch (error) {
-      console.error('Error checking Bluetooth state:', error);
-      // Assume enabled for demo purposes
+      console.log('Native Bluetooth initialization failed:', error);
+      // Keep demo mode enabled
+      setUseDemoMode(true);
       setIsBluetoothEnabled(true);
     }
   };
 
   const requestPermissions = async (): Promise<boolean> => {
     if (Platform.OS === 'web') {
-      return true; // Web handles permissions through browser
+      return true;
     }
 
     if (Platform.OS === 'android') {
@@ -116,7 +138,7 @@ export function useBluetooth() {
       }
     }
 
-    return true; // iOS handles permissions automatically
+    return true;
   };
 
   const startScan = async (): Promise<void> => {
@@ -144,50 +166,39 @@ export function useBluetooth() {
     setIsScanning(true);
     setDevices([]);
 
-    if (Platform.OS === 'web') {
-      // Web Bluetooth API implementation
-      try {
-        if (!navigator.bluetooth) {
-          throw new Error('Web Bluetooth not supported');
-        }
+    if (useDemoMode || Platform.OS === 'web') {
+      // Use demo mode or web Bluetooth
+      if (Platform.OS === 'web' && navigator.bluetooth && !useDemoMode) {
+        try {
+          const device = await navigator.bluetooth.requestDevice({
+            acceptAllDevices: true,
+            optionalServices: ['battery_service', 'device_information']
+          });
 
-        // Request device with basic services
-        const device = await navigator.bluetooth.requestDevice({
-          acceptAllDevices: true,
-          optionalServices: ['battery_service', 'device_information']
-        });
-
-        if (device) {
-          const webDevice: BluetoothDevice = {
-            id: device.id,
-            name: device.name || 'Unknown Device',
-            rssi: -50, // Web Bluetooth doesn't provide RSSI
-          };
-          setDevices([webDevice]);
+          if (device) {
+            const webDevice: BluetoothDevice = {
+              id: device.id,
+              name: device.name || 'Unknown Device',
+              rssi: -50,
+            };
+            setDevices([webDevice]);
+          }
+        } catch (error) {
+          console.log('Web Bluetooth failed, using demo mode');
+          simulateDeviceDiscovery();
         }
-      } catch (error) {
-        console.error('Web Bluetooth scan error:', error);
-        // Fallback to demo devices for web
+      } else {
+        // Always use demo mode for safety
         simulateDeviceDiscovery();
-      } finally {
-        setIsScanning(false);
       }
     } else {
-      // Native Bluetooth implementation with error handling
+      // Try native Bluetooth scanning
       try {
-        if (!bleManagerReady) {
-          throw new Error('BLE Manager not ready');
-        }
-
-        const BleManager = await import('react-native-ble-manager').then(module => module.default);
+        const BleManagerModule = require('react-native-ble-manager');
+        const BleManager = BleManagerModule.default || BleManagerModule;
         
-        if (!BleManager) {
-          throw new Error('BLE Manager not available');
-        }
-
         await BleManager.scan([], 10, true);
         
-        // Listen for discovered devices
         const handleDiscoverPeripheral = (peripheral: any) => {
           const device: BluetoothDevice = {
             id: peripheral.id,
@@ -209,15 +220,13 @@ export function useBluetooth() {
 
         BleManager.addListener('BleManagerDiscoverPeripheral', handleDiscoverPeripheral);
 
-        // Stop scanning after 10 seconds
         setTimeout(() => {
           stopScan();
         }, 10000);
 
       } catch (error) {
-        console.error('Native Bluetooth scan error:', error);
-        setIsScanning(false);
-        // Fallback to demo devices
+        console.log('Native scan failed, falling back to demo mode:', error);
+        setUseDemoMode(true);
         simulateDeviceDiscovery();
       }
     }
@@ -228,21 +237,24 @@ export function useBluetooth() {
 
     setIsScanning(false);
 
-    if (Platform.OS !== 'web' && bleManagerReady) {
+    if (!useDemoMode && Platform.OS !== 'web') {
       try {
-        const BleManager = await import('react-native-ble-manager').then(module => module.default);
-        if (BleManager) {
+        const BleManagerModule = require('react-native-ble-manager');
+        const BleManager = BleManagerModule.default || BleManagerModule;
+        
+        if (BleManager && typeof BleManager.stopScan === 'function') {
           await BleManager.stopScan();
           BleManager.removeAllListeners('BleManagerDiscoverPeripheral');
         }
       } catch (error) {
-        console.error('Error stopping scan:', error);
+        console.log('Error stopping native scan:', error);
       }
     }
   };
 
   const simulateDeviceDiscovery = () => {
-    // Fallback demo devices for when real Bluetooth isn't available
+    console.log('Starting demo device discovery...');
+    
     const demoDevices: BluetoothDevice[] = [
       {
         id: 'demo-golf-ball-1',
@@ -279,13 +291,39 @@ export function useBluetooth() {
     // Simulate gradual discovery
     demoDevices.forEach((device, index) => {
       setTimeout(() => {
-        setDevices(prev => [...prev, device]);
+        setDevices(prev => {
+          // Check if device already exists
+          if (prev.find(d => d.id === device.id)) {
+            return prev;
+          }
+          return [...prev, device];
+        });
       }, (index + 1) * 1000);
     });
 
     setTimeout(() => {
       setIsScanning(false);
     }, 7000);
+  };
+
+  const checkBluetoothState = async () => {
+    if (useDemoMode || Platform.OS === 'web') {
+      setIsBluetoothEnabled(true);
+      return;
+    }
+
+    try {
+      const BleManagerModule = require('react-native-ble-manager');
+      const BleManager = BleManagerModule.default || BleManagerModule;
+      
+      if (BleManager && typeof BleManager.checkState === 'function') {
+        const state = await BleManager.checkState();
+        setIsBluetoothEnabled(state === 'on');
+      }
+    } catch (error) {
+      console.log('Error checking Bluetooth state:', error);
+      setIsBluetoothEnabled(true);
+    }
   };
 
   return {
@@ -295,5 +333,6 @@ export function useBluetooth() {
     startScan,
     stopScan,
     checkBluetoothState,
+    useDemoMode, // Expose demo mode status
   };
 }
