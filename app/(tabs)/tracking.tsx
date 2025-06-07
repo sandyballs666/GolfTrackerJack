@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Target, Navigation, Trash2, Clock, MapPin, Bluetooth, Search, Smartphone, Headphones, Watch, CircleAlert as AlertCircle } from 'lucide-react-native';
+import { Target, Navigation, Trash2, Clock, MapPin, Bluetooth, Search, Smartphone, Headphones, Watch, CircleAlert as AlertCircle, Settings } from 'lucide-react-native';
 import { useBluetooth, BluetoothDevice } from '@/hooks/useBluetooth';
 import { useNavigation, NavigationCoordinate } from '@/hooks/useNavigation';
 import * as Location from 'expo-location';
@@ -24,23 +24,35 @@ export default function BallTrackingScreen() {
   const { openTurnByTurnNavigation, calculateDistance } = useNavigation();
 
   useEffect(() => {
-    (async () => {
+    initializeLocation();
+  }, []);
+
+  const initializeLocation = async () => {
+    try {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert(
           'Location Permission Required',
-          'Location access is needed to calculate distances to tracked devices and provide navigation.',
+          'Location access is needed to calculate distances to tracked devices and provide turn-by-turn navigation.',
           [{ text: 'OK' }]
         );
         return;
       }
 
-      let location = await Location.getCurrentPositionAsync({
+      let currentLocation = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.BestForNavigation,
       });
-      setLocation(location);
-    })();
-  }, []);
+      setLocation(currentLocation);
+      console.log('✅ Location initialized for tracking:', currentLocation.coords);
+    } catch (error) {
+      console.error('Location initialization error:', error);
+      Alert.alert(
+        'Location Error',
+        'Failed to get your current location. Please check your location settings.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
 
   // Convert discovered Bluetooth devices to tracked devices
   useEffect(() => {
@@ -72,6 +84,7 @@ export default function BallTrackingScreen() {
       });
 
       setTrackedDevices(newTrackedDevices);
+      console.log(`📱 Updated tracked devices: ${newTrackedDevices.length} devices`);
     }
   }, [devices, location]);
 
@@ -93,9 +106,9 @@ export default function BallTrackingScreen() {
   const getDeviceType = (deviceName: string): TrackedDevice['type'] => {
     const name = deviceName.toLowerCase();
     if (name.includes('ball') || name.includes('golf')) return 'ball';
-    if (name.includes('airpods') || name.includes('headphones') || name.includes('buds')) return 'headphones';
-    if (name.includes('watch')) return 'watch';
-    if (name.includes('iphone') || name.includes('phone') || name.includes('samsung')) return 'phone';
+    if (name.includes('airpods') || name.includes('headphones') || name.includes('buds') || name.includes('beats')) return 'headphones';
+    if (name.includes('watch') || name.includes('garmin') || name.includes('fitbit')) return 'watch';
+    if (name.includes('iphone') || name.includes('phone') || name.includes('samsung') || name.includes('pixel')) return 'phone';
     return 'unknown';
   };
 
@@ -103,7 +116,7 @@ export default function BallTrackingScreen() {
     if (Platform.OS === 'web') {
       Alert.alert(
         'Platform Not Supported',
-        'Bluetooth scanning is not available on web browsers. Please use the mobile app on iOS or Android.',
+        'Real Bluetooth scanning requires a native mobile app on iOS or Android.\n\nTo use this feature:\n1. Build the app for iOS/Android\n2. Install on a physical device\n3. Grant Bluetooth permissions',
         [{ text: 'OK' }]
       );
       return;
@@ -111,12 +124,6 @@ export default function BallTrackingScreen() {
 
     try {
       await startScan();
-      
-      Alert.alert(
-        '🔍 Bluetooth Scan Started',
-        'Scanning for nearby Bluetooth devices including phones, watches, headphones, and smart golf equipment...',
-        [{ text: 'OK' }]
-      );
     } catch (error) {
       console.error('Scan start error:', error);
       Alert.alert(
@@ -136,7 +143,7 @@ export default function BallTrackingScreen() {
     
     Alert.alert(
       `${deviceIcon} Navigate to ${device.name}`,
-      `Start turn-by-turn navigation to this device?\n\n📍 ${distanceText}\n📶 Signal: ${signalStrength}dBm${device.hole ? `\n⛳ Hole ${device.hole}` : ''}\n\n🧭 This will open your maps app with walking directions.`,
+      `Start turn-by-turn walking navigation to this device?\n\n📍 ${distanceText}\n📶 Signal: ${signalStrength}dBm${device.hole ? `\n⛳ Hole ${device.hole}` : ''}\n\n🧭 This will open your maps app with precise walking directions.`,
       [
         { text: 'Cancel', style: 'cancel' },
         { 
@@ -148,7 +155,7 @@ export default function BallTrackingScreen() {
               console.error('Navigation error:', error);
               Alert.alert(
                 'Navigation Error',
-                'Failed to start navigation. Please ensure you have a maps app installed.',
+                'Failed to start navigation. Please ensure you have a maps app installed and try again.',
                 [{ text: 'OK' }]
               );
             }
@@ -225,7 +232,7 @@ export default function BallTrackingScreen() {
       >
         <Text style={styles.headerTitle}>Ball Tracker</Text>
         <Text style={styles.headerSubtitle}>
-          Real-time device tracking
+          Real-time device tracking & navigation
         </Text>
       </LinearGradient>
 
@@ -280,7 +287,7 @@ export default function BallTrackingScreen() {
           >
             <Search size={20} color="white" />
             <Text style={styles.scanButtonText}>
-              {isScanning ? 'Scanning for Devices...' : 'Scan for Bluetooth Devices'}
+              {isScanning ? 'Scanning for Real Devices...' : 'Scan for Bluetooth Devices'}
             </Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -288,7 +295,7 @@ export default function BallTrackingScreen() {
         {/* Device List */}
         <View style={styles.devicesList}>
           <Text style={styles.sectionTitle}>
-            {isScanning ? 'Discovering Devices...' : 'Tracked Devices'}
+            {isScanning ? 'Discovering Real Devices...' : 'Tracked Devices'}
           </Text>
           
           {trackedDevices.length === 0 && !isScanning && !scanError ? (
@@ -373,15 +380,36 @@ export default function BallTrackingScreen() {
             colors={['#1F2937', '#374151']}
             style={styles.instructionsGradient}
           >
-            <Text style={styles.instructionsTitle}>How to Use</Text>
+            <Text style={styles.instructionsTitle}>How to Use Real Bluetooth Tracking</Text>
             <Text style={styles.instructionsText}>
-              1. Tap "Scan" to discover nearby Bluetooth devices{'\n'}
-              2. Tap the navigation icon to get turn-by-turn directions{'\n'}
+              1. Tap "Scan" to discover nearby real Bluetooth devices{'\n'}
+              2. Tap the navigation icon to get turn-by-turn walking directions{'\n'}
               3. Long press a device to stop tracking it{'\n'}
-              4. Works with golf balls, phones, watches, and more!
+              4. Works with golf balls, phones, watches, headphones, and more!{'\n\n'}
+              📱 Requires development build with react-native-ble-manager
             </Text>
           </LinearGradient>
         </View>
+
+        {/* Development Build Notice */}
+        {Platform.OS !== 'web' && (
+          <View style={styles.noticeCard}>
+            <LinearGradient
+              colors={['#1F2937', '#374151']}
+              style={styles.noticeGradient}
+            >
+              <Settings size={24} color="#3B82F6" />
+              <View style={styles.noticeContent}>
+                <Text style={styles.noticeTitle}>Real Bluetooth Scanning</Text>
+                <Text style={styles.noticeText}>
+                  This app scans for actual nearby Bluetooth devices including phones, watches, headphones, 
+                  and smart golf equipment. For full functionality, ensure you have a development build 
+                  with react-native-ble-manager installed.
+                </Text>
+              </View>
+            </LinearGradient>
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -588,7 +616,7 @@ const styles = StyleSheet.create({
   },
   instructionsCard: {
     marginTop: 20,
-    marginBottom: 40,
+    marginBottom: 20,
     borderRadius: 16,
     overflow: 'hidden',
   },
@@ -602,6 +630,31 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   instructionsText: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    lineHeight: 20,
+  },
+  noticeCard: {
+    marginBottom: 40,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  noticeGradient: {
+    flexDirection: 'row',
+    padding: 20,
+    alignItems: 'flex-start',
+  },
+  noticeContent: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  noticeTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: 8,
+  },
+  noticeText: {
     fontSize: 14,
     color: '#9CA3AF',
     lineHeight: 20,

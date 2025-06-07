@@ -8,163 +8,128 @@ export interface NavigationCoordinate {
 export function useNavigation() {
   const openTurnByTurnNavigation = async (
     destination: NavigationCoordinate,
-    destinationName: string = 'Destination'
+    destinationName: string = 'Device Location'
   ): Promise<void> => {
     try {
-      console.log(`🧭 Starting navigation to ${destinationName} at ${destination.latitude}, ${destination.longitude}`);
+      console.log(`🧭 Starting turn-by-turn navigation to ${destinationName}`);
+      console.log(`📍 Coordinates: ${destination.latitude}, ${destination.longitude}`);
       
       let navigationUrl: string;
       let appName: string;
+      let success = false;
 
       if (Platform.OS === 'ios') {
-        // Try Apple Maps first (native turn-by-turn)
-        navigationUrl = `maps://?daddr=${destination.latitude},${destination.longitude}&dirflg=d&t=m`;
+        // Try Apple Maps first (best integration on iOS)
+        navigationUrl = `maps://?daddr=${destination.latitude},${destination.longitude}&dirflg=w&t=m`;
         appName = 'Apple Maps';
         
-        const canOpenAppleMaps = await Linking.canOpenURL(navigationUrl);
-        if (!canOpenAppleMaps) {
-          // Fallback to Google Maps app
+        try {
+          const canOpenAppleMaps = await Linking.canOpenURL(navigationUrl);
+          if (canOpenAppleMaps) {
+            await Linking.openURL(navigationUrl);
+            success = true;
+            console.log('✅ Opened Apple Maps successfully');
+          }
+        } catch (error) {
+          console.log('Apple Maps failed, trying Google Maps...');
+        }
+        
+        // Fallback to Google Maps app
+        if (!success) {
           navigationUrl = `comgooglemaps://?daddr=${destination.latitude},${destination.longitude}&directionsmode=walking`;
           appName = 'Google Maps';
           
-          const canOpenGoogleMaps = await Linking.canOpenURL(navigationUrl);
-          if (!canOpenGoogleMaps) {
-            // Final fallback to web Google Maps
-            navigationUrl = `https://maps.google.com/maps?daddr=${destination.latitude},${destination.longitude}&dirflg=w`;
-            appName = 'Google Maps (Web)';
+          try {
+            const canOpenGoogleMaps = await Linking.canOpenURL(navigationUrl);
+            if (canOpenGoogleMaps) {
+              await Linking.openURL(navigationUrl);
+              success = true;
+              console.log('✅ Opened Google Maps app successfully');
+            }
+          } catch (error) {
+            console.log('Google Maps app failed, trying web fallback...');
           }
         }
+        
       } else if (Platform.OS === 'android') {
-        // Try Google Maps app first (native turn-by-turn)
+        // Try Google Maps navigation intent first (best on Android)
         navigationUrl = `google.navigation:q=${destination.latitude},${destination.longitude}&mode=w`;
         appName = 'Google Maps';
         
-        const canOpenGoogleMaps = await Linking.canOpenURL(navigationUrl);
-        if (!canOpenGoogleMaps) {
-          // Fallback to generic maps intent
-          navigationUrl = `geo:${destination.latitude},${destination.longitude}?q=${destination.latitude},${destination.longitude}(${destinationName})`;
+        try {
+          const canOpenGoogleNav = await Linking.canOpenURL(navigationUrl);
+          if (canOpenGoogleNav) {
+            await Linking.openURL(navigationUrl);
+            success = true;
+            console.log('✅ Opened Google Maps navigation successfully');
+          }
+        } catch (error) {
+          console.log('Google Navigation failed, trying generic geo intent...');
+        }
+        
+        // Fallback to generic geo intent
+        if (!success) {
+          navigationUrl = `geo:${destination.latitude},${destination.longitude}?q=${destination.latitude},${destination.longitude}(${encodeURIComponent(destinationName)})`;
           appName = 'Maps';
           
-          const canOpenGeo = await Linking.canOpenURL(navigationUrl);
-          if (!canOpenGeo) {
-            // Final fallback to web Google Maps
-            navigationUrl = `https://maps.google.com/maps?daddr=${destination.latitude},${destination.longitude}&dirflg=w`;
-            appName = 'Google Maps (Web)';
+          try {
+            const canOpenGeo = await Linking.canOpenURL(navigationUrl);
+            if (canOpenGeo) {
+              await Linking.openURL(navigationUrl);
+              success = true;
+              console.log('✅ Opened geo intent successfully');
+            }
+          } catch (error) {
+            console.log('Geo intent failed, trying web fallback...');
           }
         }
-      } else {
-        // Web platform - open Google Maps in new tab with turn-by-turn
-        navigationUrl = `https://maps.google.com/maps?daddr=${destination.latitude},${destination.longitude}&dirflg=w&nav=1`;
-        appName = 'Google Maps';
-        
-        // Force open in new tab for web
-        window.open(navigationUrl, '_blank', 'noopener,noreferrer');
-        
-        Alert.alert(
-          '🧭 Navigation Started!',
-          `Turn-by-turn navigation to ${destinationName} is now active in ${appName}!\n\nFollow the directions to reach your device.`,
-          [{ text: 'Got it!' }]
-        );
-        return;
       }
 
-      // Open the navigation app
-      console.log(`🚀 Opening ${appName} with URL: ${navigationUrl}`);
-      
-      const supported = await Linking.canOpenURL(navigationUrl);
-      if (supported) {
-        await Linking.openURL(navigationUrl);
+      // Web fallback or if native apps failed
+      if (!success) {
+        navigationUrl = `https://maps.google.com/maps?daddr=${destination.latitude},${destination.longitude}&dirflg=w&nav=1`;
+        appName = 'Google Maps (Web)';
         
-        // Show success message
+        try {
+          if (Platform.OS === 'web') {
+            window.open(navigationUrl, '_blank', 'noopener,noreferrer');
+          } else {
+            await Linking.openURL(navigationUrl);
+          }
+          success = true;
+          console.log('✅ Opened web maps successfully');
+        } catch (error) {
+          console.error('All navigation methods failed:', error);
+          throw new Error('Unable to open any navigation app');
+        }
+      }
+
+      // Show success message
+      if (success) {
         setTimeout(() => {
           Alert.alert(
-            '🧭 Navigation Active!',
-            `Turn-by-turn navigation to ${destinationName} is now running in ${appName}!\n\n📍 Follow the directions to reach your device.\n🚶‍♂️ Walking mode enabled for precise location.`,
+            '🧭 Navigation Started!',
+            `Turn-by-turn walking directions to ${destinationName} are now active in ${appName}!\n\n📍 Follow the directions to reach your device.\n🚶‍♂️ Walking mode enabled for precise location.`,
             [{ text: 'Perfect!' }]
           );
-        }, 500);
-        
-      } else {
-        throw new Error(`Cannot open ${appName}`);
+        }, 1000);
       }
+        
     } catch (error) {
       console.error('Navigation error:', error);
       
-      // Ultimate fallback - always works
-      const webUrl = `https://maps.google.com/maps?daddr=${destination.latitude},${destination.longitude}&dirflg=w&nav=1`;
-      
-      try {
-        if (Platform.OS === 'web') {
-          window.open(webUrl, '_blank', 'noopener,noreferrer');
-        } else {
-          await Linking.openURL(webUrl);
-        }
-        
-        Alert.alert(
-          '🗺️ Navigation Started',
-          `Navigation to ${destinationName} opened in web browser.\n\nTurn-by-turn directions are now available!`,
-          [{ text: 'OK' }]
-        );
-      } catch (fallbackError) {
-        console.error('Fallback navigation error:', fallbackError);
-        Alert.alert(
-          '❌ Navigation Error',
-          `Unable to start navigation to ${destinationName}. Please open your maps app manually and navigate to:\n\n${destination.latitude}, ${destination.longitude}`,
-          [{ text: 'OK' }]
-        );
-      }
-    }
-  };
-
-  const openInMapsApp = async (
-    destination: NavigationCoordinate,
-    destinationName: string = 'Device Location'
-  ): Promise<void> => {
-    // Alternative method that focuses on opening in maps apps
-    const urls = [];
-    
-    if (Platform.OS === 'ios') {
-      urls.push(
-        `maps://?daddr=${destination.latitude},${destination.longitude}&dirflg=d`,
-        `comgooglemaps://?daddr=${destination.latitude},${destination.longitude}&directionsmode=walking`
+      // Ultimate fallback with manual coordinates
+      Alert.alert(
+        '❌ Navigation Error',
+        `Unable to start automatic navigation to ${destinationName}.\n\nManual coordinates:\n${destination.latitude}, ${destination.longitude}\n\nPlease open your maps app and enter these coordinates manually.`,
+        [
+          { text: 'Copy Coordinates', onPress: () => {
+            // Could implement clipboard copy here
+            console.log('Coordinates to copy:', `${destination.latitude}, ${destination.longitude}`);
+          }},
+          { text: 'OK' }
+        ]
       );
-    } else if (Platform.OS === 'android') {
-      urls.push(
-        `google.navigation:q=${destination.latitude},${destination.longitude}&mode=w`,
-        `geo:${destination.latitude},${destination.longitude}?q=${destination.latitude},${destination.longitude}(${destinationName})`
-      );
-    }
-    
-    // Try each URL until one works
-    for (const url of urls) {
-      try {
-        const canOpen = await Linking.canOpenURL(url);
-        if (canOpen) {
-          await Linking.openURL(url);
-          return;
-        }
-      } catch (error) {
-        console.log(`Failed to open ${url}:`, error);
-      }
-    }
-    
-    // If no native app works, use web fallback
-    await openTurnByTurnNavigation(destination, destinationName);
-  };
-
-  const getDirectionsUrl = (
-    destination: NavigationCoordinate,
-    origin?: NavigationCoordinate
-  ): string => {
-    const destParam = `${destination.latitude},${destination.longitude}`;
-    const originParam = origin ? `${origin.latitude},${origin.longitude}` : '';
-    
-    if (Platform.OS === 'ios') {
-      return `maps://?saddr=${originParam}&daddr=${destParam}&dirflg=d`;
-    } else if (Platform.OS === 'android') {
-      return `google.navigation:q=${destParam}&mode=w`;
-    } else {
-      return `https://maps.google.com/maps?saddr=${originParam}&daddr=${destParam}&dirflg=w&nav=1`;
     }
   };
 
@@ -187,10 +152,25 @@ export function useNavigation() {
     return Math.round(distance);
   };
 
+  const getDirectionsUrl = (
+    destination: NavigationCoordinate,
+    origin?: NavigationCoordinate
+  ): string => {
+    const destParam = `${destination.latitude},${destination.longitude}`;
+    const originParam = origin ? `${origin.latitude},${origin.longitude}` : '';
+    
+    if (Platform.OS === 'ios') {
+      return `maps://?saddr=${originParam}&daddr=${destParam}&dirflg=w`;
+    } else if (Platform.OS === 'android') {
+      return `google.navigation:q=${destParam}&mode=w`;
+    } else {
+      return `https://maps.google.com/maps?saddr=${originParam}&daddr=${destParam}&dirflg=w&nav=1`;
+    }
+  };
+
   return {
     openTurnByTurnNavigation,
-    openInMapsApp,
-    getDirectionsUrl,
     calculateDistance,
+    getDirectionsUrl,
   };
 }

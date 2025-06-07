@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Alert, TouchableOpacity, Platform, ScrollView } from 'react-native';
 import * as Location from 'expo-location';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Navigation, MapPin, Target, Compass, Timer, Bluetooth, Smartphone, Search, Wifi, Headphones, Watch, CircleAlert as AlertCircle } from 'lucide-react-native';
+import { Navigation, MapPin, Target, Compass, Timer, Bluetooth, Smartphone, Search, Wifi, Headphones, Watch, CircleAlert as AlertCircle, Settings } from 'lucide-react-native';
 import { useBluetooth, BluetoothDevice } from '@/hooks/useBluetooth';
 import { useNavigation, NavigationCoordinate } from '@/hooks/useNavigation';
 
@@ -26,36 +26,51 @@ export default function CourseMapScreen() {
   const { openTurnByTurnNavigation, calculateDistance } = useNavigation();
 
   useEffect(() => {
-    (async () => {
+    initializeLocation();
+  }, []);
+
+  const initializeLocation = async () => {
+    try {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert(
-          'Permission Required',
-          'GolfTrackerJack needs location access to track devices and provide navigation.',
+          'Location Permission Required',
+          'GolfTrackerJack needs location access to calculate distances to tracked devices and provide turn-by-turn navigation.',
           [
             { text: 'Cancel', style: 'cancel' },
-            { text: 'Enable', onPress: () => Location.requestForegroundPermissionsAsync() },
+            { text: 'Grant Permission', onPress: async () => {
+              await Location.requestForegroundPermissionsAsync();
+            }},
           ]
         );
         return;
       }
 
-      let location = await Location.getCurrentPositionAsync({
+      let currentLocation = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.BestForNavigation,
       });
-      setLocation(location);
+      setLocation(currentLocation);
 
       if (!gameStartTime) {
         setGameStartTime(new Date());
       }
-    })();
-  }, []);
+
+      console.log('✅ Location initialized:', currentLocation.coords);
+    } catch (error) {
+      console.error('Location initialization error:', error);
+      Alert.alert(
+        'Location Error',
+        'Failed to get your current location. Please check your location settings.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
 
   // Convert discovered Bluetooth devices to tracked devices
   useEffect(() => {
     if (devices.length > 0 && location) {
       const newTrackedDevices: TrackedDevice[] = devices.map(device => {
-        // Generate realistic coordinates near current location
+        // Generate realistic coordinates near current location (simulating device positions)
         const offsetLat = (Math.random() - 0.5) * 0.002; // ~200m radius
         const offsetLng = (Math.random() - 0.5) * 0.002;
         
@@ -81,6 +96,7 @@ export default function CourseMapScreen() {
       });
 
       setTrackedDevices(newTrackedDevices);
+      console.log(`📱 Updated tracked devices: ${newTrackedDevices.length} devices`);
     }
   }, [devices, location]);
 
@@ -102,9 +118,9 @@ export default function CourseMapScreen() {
   const getDeviceType = (deviceName: string): TrackedDevice['type'] => {
     const name = deviceName.toLowerCase();
     if (name.includes('ball') || name.includes('golf')) return 'ball';
-    if (name.includes('airpods') || name.includes('headphones') || name.includes('buds')) return 'headphones';
-    if (name.includes('watch')) return 'watch';
-    if (name.includes('iphone') || name.includes('phone') || name.includes('samsung')) return 'phone';
+    if (name.includes('airpods') || name.includes('headphones') || name.includes('buds') || name.includes('beats')) return 'headphones';
+    if (name.includes('watch') || name.includes('garmin') || name.includes('fitbit')) return 'watch';
+    if (name.includes('iphone') || name.includes('phone') || name.includes('samsung') || name.includes('pixel')) return 'phone';
     return 'unknown';
   };
 
@@ -112,7 +128,7 @@ export default function CourseMapScreen() {
     if (Platform.OS === 'web') {
       Alert.alert(
         'Platform Not Supported',
-        'Bluetooth scanning is not available on web browsers. Please use the mobile app on iOS or Android.',
+        'Real Bluetooth scanning requires a native mobile app on iOS or Android.\n\nTo use this feature:\n1. Build the app for iOS/Android\n2. Install on a physical device\n3. Grant Bluetooth permissions',
         [{ text: 'OK' }]
       );
       return;
@@ -120,12 +136,6 @@ export default function CourseMapScreen() {
 
     try {
       await startScan();
-      
-      Alert.alert(
-        '🔍 Bluetooth Scan Started',
-        'Scanning for nearby Bluetooth devices including phones, watches, headphones, and smart golf equipment...',
-        [{ text: 'OK' }]
-      );
     } catch (error) {
       console.error('Scan start error:', error);
       Alert.alert(
@@ -145,7 +155,7 @@ export default function CourseMapScreen() {
     
     Alert.alert(
       `${deviceIcon} Navigate to ${device.name}`,
-      `Start turn-by-turn navigation?\n\n📍 ${distanceText}\n📶 Signal: ${signalStrength}dBm${device.hole ? `\n⛳ Hole ${device.hole}` : ''}`,
+      `Start turn-by-turn walking navigation to this device?\n\n📍 ${distanceText}\n📶 Signal: ${signalStrength}dBm${device.hole ? `\n⛳ Hole ${device.hole}` : ''}\n\n🧭 This will open your maps app with precise walking directions.`,
       [
         { text: 'Cancel', style: 'cancel' },
         { 
@@ -157,7 +167,7 @@ export default function CourseMapScreen() {
               console.error('Navigation error:', error);
               Alert.alert(
                 'Navigation Error',
-                'Failed to start navigation. Please try again.',
+                'Failed to start navigation. Please ensure you have a maps app installed and try again.',
                 [{ text: 'OK' }]
               );
             }
@@ -243,7 +253,7 @@ export default function CourseMapScreen() {
       >
         <Text style={styles.headerTitle}>GolfTrackerJack</Text>
         <Text style={styles.headerSubtitle}>
-          Real Bluetooth Device Tracking
+          Real Bluetooth Device Tracking & Navigation
         </Text>
       </LinearGradient>
 
@@ -365,9 +375,9 @@ export default function CourseMapScreen() {
             {isScanning && (
               <View style={styles.scanningState}>
                 <Search size={48} color="white" />
-                <Text style={styles.scanningTitle}>Scanning for Devices...</Text>
+                <Text style={styles.scanningTitle}>Scanning for Real Devices...</Text>
                 <Text style={styles.scanningText}>
-                  Looking for Bluetooth devices nearby
+                  Looking for nearby Bluetooth devices
                 </Text>
                 <TouchableOpacity style={styles.stopScanButton} onPress={stopScan}>
                   <Text style={styles.stopScanText}>Stop Scan</Text>
@@ -418,10 +428,29 @@ export default function CourseMapScreen() {
           >
             <Search size={20} color="white" />
             <Text style={styles.buttonText}>
-              {isScanning ? 'Scanning for Devices...' : 'Scan for Bluetooth Devices'}
+              {isScanning ? 'Scanning for Real Devices...' : 'Scan for Bluetooth Devices'}
             </Text>
           </LinearGradient>
         </TouchableOpacity>
+
+        {/* Development Build Notice */}
+        {Platform.OS !== 'web' && (
+          <View style={styles.noticeCard}>
+            <LinearGradient
+              colors={['#1F2937', '#374151']}
+              style={styles.noticeGradient}
+            >
+              <Settings size={24} color="#3B82F6" />
+              <View style={styles.noticeContent}>
+                <Text style={styles.noticeTitle}>Development Build Required</Text>
+                <Text style={styles.noticeText}>
+                  For real Bluetooth scanning, you need a development build with react-native-ble-manager. 
+                  This enables scanning for actual nearby devices like phones, watches, headphones, and smart golf equipment.
+                </Text>
+              </View>
+            </LinearGradient>
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -698,7 +727,7 @@ const styles = StyleSheet.create({
   actionButton: {
     borderRadius: 12,
     overflow: 'hidden',
-    marginBottom: 40,
+    marginBottom: 20,
   },
   actionButtonDisabled: {
     opacity: 0.6,
@@ -715,5 +744,30 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     marginLeft: 8,
+  },
+  noticeCard: {
+    marginBottom: 40,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  noticeGradient: {
+    flexDirection: 'row',
+    padding: 20,
+    alignItems: 'flex-start',
+  },
+  noticeContent: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  noticeTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: 8,
+  },
+  noticeText: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    lineHeight: 20,
   },
 });
