@@ -244,7 +244,7 @@ export default function CourseMapScreen() {
       </LinearGradient>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Game Info Panel */}
+        {/* Compact Game Info Panel */}
         <View style={styles.gameInfoPanel}>
           <LinearGradient
             colors={['rgba(31, 41, 55, 0.95)', 'rgba(55, 65, 81, 0.95)']}
@@ -252,22 +252,22 @@ export default function CourseMapScreen() {
           >
             <View style={styles.gameInfoRow}>
               <View style={styles.gameInfoItem}>
-                <Target size={16} color="#22C55E" />
-                <Text style={styles.gameInfoLabel}>Hole</Text>
+                <Target size={12} color="#22C55E" />
                 <Text style={styles.gameInfoValue}>{currentHole}</Text>
+                <Text style={styles.gameInfoLabel}>Hole</Text>
               </View>
               
               <TouchableOpacity 
                 style={styles.holeButton}
                 onPress={() => setCurrentHole(h => h < 18 ? h + 1 : h)}
               >
-                <Text style={styles.holeButtonText}>Next Hole</Text>
+                <Text style={styles.holeButtonText}>Next</Text>
               </TouchableOpacity>
               
               <View style={styles.gameInfoItem}>
-                <Timer size={16} color="#3B82F6" />
-                <Text style={styles.gameInfoLabel}>Time</Text>
+                <Timer size={12} color="#3B82F6" />
                 <Text style={styles.gameInfoValue}>{formatGameTime()}</Text>
+                <Text style={styles.gameInfoLabel}>Time</Text>
               </View>
             </View>
           </LinearGradient>
@@ -422,13 +422,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   gameInfoPanel: {
-    marginBottom: 20,
-    borderRadius: 12,
+    marginBottom: 16,
+    borderRadius: 8,
     overflow: 'hidden',
   },
   gameInfoGradient: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
   },
   gameInfoRow: {
     flexDirection: 'row',
@@ -437,29 +437,30 @@ const styles = StyleSheet.create({
   },
   gameInfoItem: {
     alignItems: 'center',
-    gap: 4,
+    gap: 2,
+    minWidth: 50,
   },
   gameInfoLabel: {
-    fontSize: 10,
+    fontSize: 9,
     color: '#9CA3AF',
     fontWeight: '600',
   },
   gameInfoValue: {
-    fontSize: 16,
+    fontSize: 14,
     color: 'white',
     fontWeight: 'bold',
   },
   holeButton: {
     backgroundColor: 'rgba(34, 197, 94, 0.2)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: '#22C55E',
   },
   holeButtonText: {
     color: '#22C55E',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
   },
   mapSection: {
