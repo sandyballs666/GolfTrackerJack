@@ -273,7 +273,7 @@ export default function CourseMapScreen() {
           </LinearGradient>
         </View>
 
-        {/* Map Placeholder with Device List */}
+        {/* Map Section with Device List */}
         <View style={styles.mapSection}>
           <LinearGradient
             colors={['#059669', '#047857']}
@@ -294,38 +294,40 @@ export default function CourseMapScreen() {
             {trackedDevices.length > 0 && (
               <View style={styles.devicesContainer}>
                 <Text style={styles.devicesTitle}>Nearby Devices:</Text>
-                {trackedDevices.map((device) => {
-                  const DeviceIcon = getDeviceIcon(device.type);
-                  return (
-                    <TouchableOpacity
-                      key={device.id}
-                      style={styles.deviceItem}
-                      onPress={() => navigateToDevice(device)}
-                      onLongPress={() => removeDevice(device.id)}
-                    >
-                      <View style={styles.deviceInfo}>
-                        <View style={styles.deviceHeader}>
-                          <DeviceIcon size={18} color="white" />
-                          <Text style={styles.deviceName}>{device.name}</Text>
-                          {device.type === 'ball' && device.hole && (
-                            <View style={styles.holeChip}>
-                              <Text style={styles.holeChipText}>H{device.hole}</Text>
-                            </View>
-                          )}
-                        </View>
-                        <View style={styles.deviceDetails}>
-                          <Text style={styles.deviceDistance}>{device.distance}m</Text>
-                          <View style={styles.signalIndicator}>
-                            <View style={[styles.signalDot, { backgroundColor: getSignalColor(device.signalStrength) }]} />
-                            <Text style={styles.signalText}>{device.signalStrength}%</Text>
+                <ScrollView style={styles.devicesList} nestedScrollEnabled={true}>
+                  {trackedDevices.map((device) => {
+                    const DeviceIcon = getDeviceIcon(device.type);
+                    return (
+                      <TouchableOpacity
+                        key={device.id}
+                        style={styles.deviceItem}
+                        onPress={() => navigateToDevice(device)}
+                        onLongPress={() => removeDevice(device.id)}
+                      >
+                        <View style={styles.deviceInfo}>
+                          <View style={styles.deviceHeader}>
+                            <DeviceIcon size={18} color="white" />
+                            <Text style={styles.deviceName}>{device.name}</Text>
+                            {device.type === 'ball' && device.hole && (
+                              <View style={styles.holeChip}>
+                                <Text style={styles.holeChipText}>H{device.hole}</Text>
+                              </View>
+                            )}
                           </View>
-                          <Text style={styles.lastSeenText}>{formatLastSeen(device.lastSeen)}</Text>
+                          <View style={styles.deviceDetails}>
+                            <Text style={styles.deviceDistance}>{device.distance}m</Text>
+                            <View style={styles.signalIndicator}>
+                              <View style={[styles.signalDot, { backgroundColor: getSignalColor(device.signalStrength) }]} />
+                              <Text style={styles.signalText}>{device.signalStrength}%</Text>
+                            </View>
+                            <Text style={styles.lastSeenText}>{formatLastSeen(device.lastSeen)}</Text>
+                          </View>
                         </View>
-                      </View>
-                      <Navigation size={16} color="white" />
-                    </TouchableOpacity>
-                  );
-                })}
+                        <Navigation size={16} color="white" />
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
               </View>
             )}
 
@@ -347,14 +349,14 @@ export default function CourseMapScreen() {
           </LinearGradient>
         </View>
 
-        {/* Stats Cards */}
+        {/* Stats Cards - Now in normal flow */}
         <View style={styles.statsGrid}>
           <LinearGradient
             colors={['#22C55E', '#16A34A']}
             style={styles.statCard}
           >
             <View style={styles.cardContent}>
-              <Target size={24} color="white" />
+              <Target size={20} color="white" />
               <View style={styles.cardText}>
                 <Text style={styles.cardTitle}>Devices Tracked</Text>
                 <Text style={styles.cardValue}>{trackedDevices.length}</Text>
@@ -367,7 +369,7 @@ export default function CourseMapScreen() {
             style={styles.statCard}
           >
             <View style={styles.cardContent}>
-              <Bluetooth size={24} color="white" />
+              <Bluetooth size={20} color="white" />
               <View style={styles.cardText}>
                 <Text style={styles.cardTitle}>Find My Network</Text>
                 <Text style={styles.cardValue}>{isScanning ? 'SCANNING' : 'READY'}</Text>
@@ -376,7 +378,7 @@ export default function CourseMapScreen() {
           </LinearGradient>
         </View>
 
-        {/* Action Button */}
+        {/* Action Button - Now in normal flow */}
         <TouchableOpacity 
           style={[styles.actionButton, isScanning && styles.actionButtonDisabled]} 
           onPress={startDeviceScanning}
@@ -464,7 +466,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   mapSection: {
-    height: 400,
+    height: 450,
     marginBottom: 20,
     borderRadius: 16,
     overflow: 'hidden',
@@ -498,6 +500,10 @@ const styles = StyleSheet.create({
     color: 'white',
     marginBottom: 12,
     textAlign: 'center',
+  },
+  devicesList: {
+    flex: 1,
+    maxHeight: 280,
   },
   deviceItem: {
     flexDirection: 'row',
@@ -603,24 +609,24 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 12,
+    padding: 14,
   },
   cardContent: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   cardText: {
-    marginLeft: 16,
+    marginLeft: 12,
   },
   cardTitle: {
-    fontSize: 12,
+    fontSize: 11,
     color: 'rgba(255, 255, 255, 0.8)',
     marginBottom: 4,
     fontWeight: '600',
   },
   cardValue: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
     color: 'white',
   },
@@ -636,12 +642,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
+    paddingVertical: 14,
     paddingHorizontal: 20,
   },
   buttonText: {
     color: 'white',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     marginLeft: 8,
   },
