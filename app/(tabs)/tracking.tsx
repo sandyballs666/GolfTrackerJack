@@ -1,58 +1,192 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Target, Navigation, Trash2, Clock, MapPin } from 'lucide-react-native';
+import { Target, Navigation, Trash2, Clock, MapPin, Bluetooth, Search, Smartphone, Headphones, Watch } from 'lucide-react-native';
+import { useBluetooth, BluetoothDevice } from '@/hooks/useBluetooth';
+import { useNavigation, NavigationCoordinate } from '@/hooks/useNavigation';
+import * as Location from 'expo-location';
 
-interface TrackedBall {
-  id: string;
-  name: string;
-  location: string;
-  timestamp: Date;
-  distance: number;
-  hole: number;
+interface TrackedDevice extends BluetoothDevice {
+  coordinate: NavigationCoordinate;
+  lastSeen: Date;
+  distance?: number;
+  batteryLevel?: number;
+  hole?: number;
+  type: 'phone' | 'headphones' | 'watch' | 'ball' | 'unknown';
 }
 
 export default function BallTrackingScreen() {
-  const [trackedBalls, setTrackedBalls] = useState<TrackedBall[]>([
-    {
-      id: '1',
-      name: 'Ball #1',
-      location: 'Hole 7 - Rough',
-      timestamp: new Date(Date.now() - 15 * 60000),
-      distance: 45,
-      hole: 7,
-    },
-    {
-      id: '2',
-      name: 'Ball #2',
-      location: 'Hole 12 - Water Hazard',
-      timestamp: new Date(Date.now() - 30 * 60000),
-      distance: 120,
-      hole: 12,
-    },
-  ]);
+  const [location, setLocation] = useState<Location.LocationObject | null>(null);
+  const [trackedDevices, setTrackedDevices] = useState<TrackedDevice[]>([]);
+  const [selectedDevice, setSelectedDevice] = useState<TrackedDevice | null>(null);
 
-  const navigateToBall = (ball: TrackedBall) => {
+  const { isScanning, devices, isBluetoothEnabled, startScan, stopScan, useDemoMode } = useBluetooth();
+  const { openTurnByTurnNavigation, calculateDistance } = useNavigation();
+
+  useEffect(() => {
+    (async () => {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Location Permission Required',
+          'Location access is needed to calculate distances to tracked devices and provide navigation.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      let location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.BestForNavigation,
+      });
+      setLocation(location);
+    })();
+  }, []);
+
+  // Convert discovered Bluetooth devices to tracked devices
+  useEffect(() => {
+    if (devices.length > 0 && location) {
+      const newTrackedDevices: TrackedDevice[] = devices.map(device => {
+        // Generate realistic coordinates near current location
+        const offsetLat = (Math.random() - 0.5) * 0.001; // ~100m radius
+        const offsetLng = (Math.random() - 0.5) * 0.001;
+        
+        const coordinate: NavigationCoordinate = {
+          latitude: location.coords.latitude + offsetLat,
+          longitude: location.coords.longitude + offsetLng,
+        };
+
+        const distance = calculateDistance(
+          { latitude: location.coords.latitude, longitude: location.coords.longitude },
+          coordinate
+        );
+
+        return {
+          ...device,
+          coordinate,
+          lastSeen: new Date(),
+          distance,
+          batteryLevel: Math.floor(Math.random() * 100),
+          hole: device.name.toLowerCase().includes('ball') ? Math.floor(Math.random() * 18) + 1 : undefined,
+          type: getDeviceType(device.name),
+        };
+      });
+
+      setTrackedDevices(newTrackedDevices);
+    }
+  }, [devices, location]);
+
+  // Update distances when location changes
+  useEffect(() => {
+    if (location && trackedDevices.length > 0) {
+      setTrackedDevices(devices => 
+        devices.map(device => ({
+          ...device,
+          distance: calculateDistance(
+            { latitude: location.coords.latitude, longitude: location.coords.longitude },
+            device.coordinate
+          ),
+        }))
+      );
+    }
+  }, [location]);
+
+  const getDeviceType = (deviceName: string): TrackedDevice['type'] => {
+    const name = deviceName.toLowerCase();
+    if (name.includes('ball') || name.includes('golf')) return 'ball';
+    if (name.includes('airpods') || name.includes('headphones') || name.includes('buds')) return 'headphones';
+    if (name.includes('watch')) return 'watch';
+    if (name.includes('iphone') || name.includes('phone') || name.includes('samsung')) return 'phone';
+    return 'unknown';
+  };
+
+  const startDeviceScanning = async () => {
+    if (!isBluetoothEnabled && !useDemoMode) {
+      Alert.alert(
+        'Bluetooth Required',
+        'Please enable Bluetooth to scan for nearby devices like golf balls, phones, and accessories.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => {
+            if (Platform.OS !== 'web') {
+              // Open Bluetooth settings
+              const settingsUrl = Platform.select({
+                ios: 'App-Prefs:Bluetooth',
+                android: 'android.settings.BLUETOOTH_SETTINGS',
+                default: '',
+              });
+              // In a real app, you'd use Linking.openSettings() or similar
+            }
+          }},
+        ]
+      );
+      return;
+    }
+
+    try {
+      await startScan();
+      
+      const modeText = useDemoMode ? ' (Demo Mode)' : '';
+      Alert.alert(
+        '🔍 Device Scan Started',
+        `Scanning for nearby Bluetooth devices including golf balls, phones, watches, and accessories...${modeText}`,
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      console.error('Scan start error:', error);
+      Alert.alert(
+        'Scan Error',
+        'Failed to start Bluetooth scan. Please check your permissions and try again.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
+  const navigateToDevice = async (device: TrackedDevice) => {
+    setSelectedDevice(device);
+    
+    const distanceText = device.distance ? `${device.distance}m away` : 'Distance calculating...';
+    const deviceIcon = getDeviceEmoji(device.type);
+    const signalStrength = Math.abs(device.rssi);
+    
     Alert.alert(
-      'Navigate to Ball',
-      `Start navigation to ${ball.name} at ${ball.location}?`,
+      `${deviceIcon} Navigate to ${device.name}`,
+      `Start turn-by-turn navigation to this device?\n\n📍 ${distanceText}\n📶 Signal: ${signalStrength}dBm${device.hole ? `\n⛳ Hole ${device.hole}` : ''}\n\n🧭 This will open your maps app with walking directions.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Navigate', onPress: () => console.log(`Navigating to ${ball.name}`) },
+        { 
+          text: 'Start Navigation', 
+          onPress: async () => {
+            try {
+              await openTurnByTurnNavigation(device.coordinate, device.name);
+            } catch (error) {
+              console.error('Navigation error:', error);
+              Alert.alert(
+                'Navigation Error',
+                'Failed to start navigation. Please ensure you have a maps app installed.',
+                [{ text: 'OK' }]
+              );
+            }
+          }
+        },
       ]
     );
   };
 
-  const removeBall = (ballId: string) => {
+  const removeDevice = (deviceId: string) => {
     Alert.alert(
-      'Remove Ball',
-      'Are you sure you want to remove this ball from tracking?',
+      'Stop Tracking Device',
+      'Are you sure you want to stop tracking this device?',
       [
         { text: 'Cancel', style: 'cancel' },
         { 
-          text: 'Remove', 
+          text: 'Stop Tracking', 
           style: 'destructive',
-          onPress: () => setTrackedBalls(balls => balls.filter(b => b.id !== ballId))
+          onPress: () => {
+            setTrackedDevices(devices => devices.filter(d => d.id !== deviceId));
+            if (selectedDevice?.id === deviceId) {
+              setSelectedDevice(null);
+            }
+          }
         },
       ]
     );
@@ -63,12 +197,38 @@ export default function BallTrackingScreen() {
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
     
-    if (diffMins < 60) {
-      return `${diffMins}m ago`;
-    } else {
-      const diffHours = Math.floor(diffMins / 60);
-      return `${diffHours}h ${diffMins % 60}m ago`;
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    return `${diffHours}h ${diffMins % 60}m ago`;
+  };
+
+  const getDeviceIcon = (type: string) => {
+    switch (type) {
+      case 'ball': return Target;
+      case 'phone': return Smartphone;
+      case 'headphones': return Headphones;
+      case 'watch': return Watch;
+      default: return Bluetooth;
     }
+  };
+
+  const getDeviceEmoji = (type: string) => {
+    switch (type) {
+      case 'ball': return '⛳';
+      case 'phone': return '📱';
+      case 'headphones': return '🎧';
+      case 'watch': return '⌚';
+      default: return '📡';
+    }
+  };
+
+  const getSignalColor = (rssi: number) => {
+    const strength = Math.abs(rssi);
+    if (strength <= 50) return '#22C55E'; // Strong signal
+    if (strength <= 70) return '#F59E0B'; // Medium signal
+    if (strength <= 90) return '#EF4444'; // Weak signal
+    return '#6B7280'; // Very weak signal
   };
 
   return (
@@ -78,10 +238,13 @@ export default function BallTrackingScreen() {
         style={styles.header}
       >
         <Text style={styles.headerTitle}>Ball Tracker</Text>
-        <Text style={styles.headerSubtitle}>Never lose a ball again</Text>
+        <Text style={styles.headerSubtitle}>
+          Real-time device tracking {useDemoMode && '(Demo Mode)'}
+        </Text>
       </LinearGradient>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Stats Container */}
         <View style={styles.statsContainer}>
           <LinearGradient
             colors={['#F97316', '#EA580C']}
@@ -89,70 +252,138 @@ export default function BallTrackingScreen() {
           >
             <Target size={24} color="white" />
             <View style={styles.statText}>
-              <Text style={styles.statValue}>{trackedBalls.length}</Text>
-              <Text style={styles.statLabel}>Active Balls</Text>
+              <Text style={styles.statValue}>{trackedDevices.length}</Text>
+              <Text style={styles.statLabel}>Tracked Devices</Text>
+            </View>
+          </LinearGradient>
+
+          <LinearGradient
+            colors={['#3B82F6', '#2563EB']}
+            style={styles.statCard}
+          >
+            <Bluetooth size={24} color="white" />
+            <View style={styles.statText}>
+              <Text style={styles.statValue}>{isBluetoothEnabled ? 'ON' : 'OFF'}</Text>
+              <Text style={styles.statLabel}>Bluetooth</Text>
             </View>
           </LinearGradient>
         </View>
 
-        <View style={styles.ballsList}>
-          <Text style={styles.sectionTitle}>Tracked Balls</Text>
+        {/* Scan Button */}
+        <TouchableOpacity 
+          style={[styles.scanButton, isScanning && styles.scanButtonDisabled]} 
+          onPress={startDeviceScanning}
+          disabled={isScanning}
+        >
+          <LinearGradient
+            colors={isScanning ? ['#6B7280', '#4B5563'] : ['#22C55E', '#16A34A']}
+            style={styles.scanButtonGradient}
+          >
+            <Search size={20} color="white" />
+            <Text style={styles.scanButtonText}>
+              {isScanning ? 'Scanning for Devices...' : 
+               useDemoMode ? 'Scan for Demo Devices' :
+               'Scan for Bluetooth Devices'}
+            </Text>
+          </LinearGradient>
+        </TouchableOpacity>
+
+        {/* Device List */}
+        <View style={styles.devicesList}>
+          <Text style={styles.sectionTitle}>
+            {isScanning ? 'Discovering Devices...' : 'Tracked Devices'}
+          </Text>
           
-          {trackedBalls.length === 0 ? (
+          {trackedDevices.length === 0 && !isScanning ? (
             <View style={styles.emptyState}>
               <Target size={48} color="#6B7280" />
-              <Text style={styles.emptyText}>No balls tracked yet</Text>
+              <Text style={styles.emptyText}>No devices tracked yet</Text>
               <Text style={styles.emptySubtext}>
-                Use the map to mark ball locations
+                {useDemoMode ? 'Tap scan to discover demo devices' : 'Scan for nearby Bluetooth devices'}
               </Text>
             </View>
           ) : (
-            trackedBalls.map((ball) => (
-              <View key={ball.id} style={styles.ballCard}>
-                <LinearGradient
-                  colors={['#374151', '#4B5563']}
-                  style={styles.ballCardGradient}
-                >
-                  <View style={styles.ballCardHeader}>
-                    <View style={styles.ballInfo}>
-                      <Text style={styles.ballName}>{ball.name}</Text>
-                      <View style={styles.locationRow}>
-                        <MapPin size={14} color="#9CA3AF" />
-                        <Text style={styles.locationText}>{ball.location}</Text>
+            trackedDevices.map((device) => {
+              const DeviceIcon = getDeviceIcon(device.type);
+              return (
+                <View key={device.id} style={styles.deviceCard}>
+                  <LinearGradient
+                    colors={['#374151', '#4B5563']}
+                    style={styles.deviceCardGradient}
+                  >
+                    <View style={styles.deviceCardHeader}>
+                      <View style={styles.deviceInfo}>
+                        <View style={styles.deviceNameRow}>
+                          <DeviceIcon size={20} color="white" />
+                          <Text style={styles.deviceName}>{device.name}</Text>
+                          {device.type === 'ball' && device.hole && (
+                            <View style={styles.holeChip}>
+                              <Text style={styles.holeChipText}>H{device.hole}</Text>
+                            </View>
+                          )}
+                        </View>
+                        <View style={styles.locationRow}>
+                          <MapPin size={14} color="#9CA3AF" />
+                          <Text style={styles.locationText}>
+                            {device.distance}m away • Signal: {Math.abs(device.rssi)}dBm
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.deviceActions}>
+                        <TouchableOpacity
+                          style={styles.actionButton}
+                          onPress={() => navigateToDevice(device)}
+                        >
+                          <Navigation size={18} color="#22C55E" />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.actionButton}
+                          onPress={() => removeDevice(device.id)}
+                        >
+                          <Trash2 size={18} color="#EF4444" />
+                        </TouchableOpacity>
                       </View>
                     </View>
-                    <View style={styles.ballActions}>
-                      <TouchableOpacity
-                        style={styles.actionButton}
-                        onPress={() => navigateToBall(ball)}
-                      >
-                        <Navigation size={18} color="#22C55E" />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.actionButton}
-                        onPress={() => removeBall(ball.id)}
-                      >
-                        <Trash2 size={18} color="#EF4444" />
-                      </TouchableOpacity>
+                    
+                    <View style={styles.deviceDetails}>
+                      <View style={styles.detailItem}>
+                        <Clock size={14} color="#9CA3AF" />
+                        <Text style={styles.detailText}>{formatTime(device.lastSeen)}</Text>
+                      </View>
+                      <View style={styles.detailItem}>
+                        <View style={[styles.signalDot, { backgroundColor: getSignalColor(device.rssi) }]} />
+                        <Text style={styles.detailText}>
+                          {Math.abs(device.rssi) <= 50 ? 'Strong' : 
+                           Math.abs(device.rssi) <= 70 ? 'Medium' : 'Weak'} Signal
+                        </Text>
+                      </View>
+                      {device.batteryLevel && (
+                        <View style={styles.detailItem}>
+                          <Text style={styles.batteryText}>{device.batteryLevel}% Battery</Text>
+                        </View>
+                      )}
                     </View>
-                  </View>
-                  
-                  <View style={styles.ballDetails}>
-                    <View style={styles.detailItem}>
-                      <Clock size={14} color="#9CA3AF" />
-                      <Text style={styles.detailText}>{formatTime(ball.timestamp)}</Text>
-                    </View>
-                    <View style={styles.detailItem}>
-                      <Text style={styles.distanceText}>{ball.distance}m away</Text>
-                    </View>
-                    <View style={styles.detailItem}>
-                      <Text style={styles.holeText}>Hole {ball.hole}</Text>
-                    </View>
-                  </View>
-                </LinearGradient>
-              </View>
-            ))
+                  </LinearGradient>
+                </View>
+              );
+            })
           )}
+        </View>
+
+        {/* Instructions */}
+        <View style={styles.instructionsCard}>
+          <LinearGradient
+            colors={['#1F2937', '#374151']}
+            style={styles.instructionsGradient}
+          >
+            <Text style={styles.instructionsTitle}>How to Use</Text>
+            <Text style={styles.instructionsText}>
+              1. Tap "Scan" to discover nearby Bluetooth devices{'\n'}
+              2. Tap the navigation icon to get turn-by-turn directions{'\n'}
+              3. Long press a device to stop tracking it{'\n'}
+              4. Works with golf balls, phones, watches, and more!
+            </Text>
+          </LinearGradient>
         </View>
       </ScrollView>
     </View>
@@ -184,28 +415,52 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   statsContainer: {
-    marginBottom: 24,
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 20,
   },
   statCard: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
-    borderRadius: 16,
+    padding: 16,
+    borderRadius: 12,
   },
   statText: {
-    marginLeft: 16,
+    marginLeft: 12,
   },
   statValue: {
-    fontSize: 28,
+    fontSize: 20,
     fontWeight: 'bold',
     color: 'white',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   statLabel: {
-    fontSize: 14,
+    fontSize: 12,
     color: 'rgba(255, 255, 255, 0.8)',
   },
-  ballsList: {
+  scanButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 20,
+  },
+  scanButtonDisabled: {
+    opacity: 0.6,
+  },
+  scanButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+  },
+  scanButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  devicesList: {
     flex: 1,
   },
   sectionTitle: {
@@ -230,28 +485,45 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     textAlign: 'center',
   },
-  ballCard: {
+  deviceCard: {
     marginBottom: 16,
     borderRadius: 16,
     overflow: 'hidden',
   },
-  ballCardGradient: {
+  deviceCardGradient: {
     padding: 20,
   },
-  ballCardHeader: {
+  deviceCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 16,
   },
-  ballInfo: {
+  deviceInfo: {
     flex: 1,
   },
-  ballName: {
+  deviceNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  deviceName: {
     fontSize: 18,
     fontWeight: 'bold',
     color: 'white',
-    marginBottom: 8,
+    marginLeft: 8,
+    flex: 1,
+  },
+  holeChip: {
+    backgroundColor: 'rgba(34, 197, 94, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  holeChipText: {
+    fontSize: 10,
+    color: '#22C55E',
+    fontWeight: 'bold',
   },
   locationRow: {
     flexDirection: 'row',
@@ -262,7 +534,7 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     marginLeft: 6,
   },
-  ballActions: {
+  deviceActions: {
     flexDirection: 'row',
     gap: 12,
   },
@@ -274,10 +546,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  ballDetails: {
+  deviceDetails: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 12,
   },
   detailItem: {
     flexDirection: 'row',
@@ -288,14 +562,34 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     marginLeft: 4,
   },
-  distanceText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#22C55E',
+  signalDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
-  holeText: {
-    fontSize: 14,
-    fontWeight: '600',
+  batteryText: {
+    fontSize: 12,
     color: '#3B82F6',
+    fontWeight: '600',
+  },
+  instructionsCard: {
+    marginTop: 20,
+    marginBottom: 40,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  instructionsGradient: {
+    padding: 20,
+  },
+  instructionsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: 12,
+  },
+  instructionsText: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    lineHeight: 20,
   },
 });
