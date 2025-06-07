@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Target, Navigation, Trash2, Clock, MapPin, Bluetooth, Search, Smartphone, Headphones, Watch } from 'lucide-react-native';
+import { Target, Navigation, Trash2, Clock, MapPin, Bluetooth, Search, Smartphone, Headphones, Watch, AlertCircle } from 'lucide-react-native';
 import { useBluetooth, BluetoothDevice } from '@/hooks/useBluetooth';
 import { useNavigation, NavigationCoordinate } from '@/hooks/useNavigation';
 import * as Location from 'expo-location';
@@ -20,7 +20,7 @@ export default function BallTrackingScreen() {
   const [trackedDevices, setTrackedDevices] = useState<TrackedDevice[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<TrackedDevice | null>(null);
 
-  const { isScanning, devices, isBluetoothEnabled, startScan, stopScan, useDemoMode } = useBluetooth();
+  const { isScanning, devices, isBluetoothEnabled, startScan, stopScan, scanError } = useBluetooth();
   const { openTurnByTurnNavigation, calculateDistance } = useNavigation();
 
   useEffect(() => {
@@ -100,24 +100,11 @@ export default function BallTrackingScreen() {
   };
 
   const startDeviceScanning = async () => {
-    if (!isBluetoothEnabled && !useDemoMode) {
+    if (Platform.OS === 'web') {
       Alert.alert(
-        'Bluetooth Required',
-        'Please enable Bluetooth to scan for nearby devices like golf balls, phones, and accessories.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Open Settings', onPress: () => {
-            if (Platform.OS !== 'web') {
-              // Open Bluetooth settings
-              const settingsUrl = Platform.select({
-                ios: 'App-Prefs:Bluetooth',
-                android: 'android.settings.BLUETOOTH_SETTINGS',
-                default: '',
-              });
-              // In a real app, you'd use Linking.openSettings() or similar
-            }
-          }},
-        ]
+        'Platform Not Supported',
+        'Bluetooth scanning is not available on web browsers. Please use the mobile app on iOS or Android.',
+        [{ text: 'OK' }]
       );
       return;
     }
@@ -125,17 +112,16 @@ export default function BallTrackingScreen() {
     try {
       await startScan();
       
-      const modeText = useDemoMode ? ' (Demo Mode)' : '';
       Alert.alert(
-        '🔍 Device Scan Started',
-        `Scanning for nearby Bluetooth devices including golf balls, phones, watches, and accessories...${modeText}`,
+        '🔍 Bluetooth Scan Started',
+        'Scanning for nearby Bluetooth devices including phones, watches, headphones, and smart golf equipment...',
         [{ text: 'OK' }]
       );
     } catch (error) {
       console.error('Scan start error:', error);
       Alert.alert(
         'Scan Error',
-        'Failed to start Bluetooth scan. Please check your permissions and try again.',
+        'Failed to start Bluetooth scan. Please check your Bluetooth settings and permissions.',
         [{ text: 'OK' }]
       );
     }
@@ -239,11 +225,24 @@ export default function BallTrackingScreen() {
       >
         <Text style={styles.headerTitle}>Ball Tracker</Text>
         <Text style={styles.headerSubtitle}>
-          Real-time device tracking {useDemoMode && '(Demo Mode)'}
+          Real-time device tracking
         </Text>
       </LinearGradient>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Error Display */}
+        {scanError && (
+          <View style={styles.errorContainer}>
+            <LinearGradient
+              colors={['#EF4444', '#DC2626']}
+              style={styles.errorGradient}
+            >
+              <AlertCircle size={20} color="white" />
+              <Text style={styles.errorText}>{scanError}</Text>
+            </LinearGradient>
+          </View>
+        )}
+
         {/* Stats Container */}
         <View style={styles.statsContainer}>
           <LinearGradient
@@ -281,9 +280,7 @@ export default function BallTrackingScreen() {
           >
             <Search size={20} color="white" />
             <Text style={styles.scanButtonText}>
-              {isScanning ? 'Scanning for Devices...' : 
-               useDemoMode ? 'Scan for Demo Devices' :
-               'Scan for Bluetooth Devices'}
+              {isScanning ? 'Scanning for Devices...' : 'Scan for Bluetooth Devices'}
             </Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -294,12 +291,12 @@ export default function BallTrackingScreen() {
             {isScanning ? 'Discovering Devices...' : 'Tracked Devices'}
           </Text>
           
-          {trackedDevices.length === 0 && !isScanning ? (
+          {trackedDevices.length === 0 && !isScanning && !scanError ? (
             <View style={styles.emptyState}>
               <Target size={48} color="#6B7280" />
               <Text style={styles.emptyText}>No devices tracked yet</Text>
               <Text style={styles.emptySubtext}>
-                {useDemoMode ? 'Tap scan to discover demo devices' : 'Scan for nearby Bluetooth devices'}
+                Scan for nearby Bluetooth devices
               </Text>
             </View>
           ) : (
@@ -413,6 +410,23 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 20,
+  },
+  errorContainer: {
+    marginBottom: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  errorGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  errorText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
+    flex: 1,
   },
   statsContainer: {
     flexDirection: 'row',

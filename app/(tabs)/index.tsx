@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Alert, TouchableOpacity, Platform, ScrollView } from 'react-native';
 import * as Location from 'expo-location';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Navigation, MapPin, Target, Compass, Timer, Bluetooth, Smartphone, Search, Wifi, Headphones, Watch } from 'lucide-react-native';
+import { Navigation, MapPin, Target, Compass, Timer, Bluetooth, Smartphone, Search, Wifi, Headphones, Watch, AlertCircle } from 'lucide-react-native';
 import { useBluetooth, BluetoothDevice } from '@/hooks/useBluetooth';
 import { useNavigation, NavigationCoordinate } from '@/hooks/useNavigation';
 
@@ -22,7 +22,7 @@ export default function CourseMapScreen() {
   const [currentHole, setCurrentHole] = useState(1);
   const [gameStartTime, setGameStartTime] = useState<Date | null>(null);
 
-  const { isScanning, devices, isBluetoothEnabled, startScan, stopScan, useDemoMode } = useBluetooth();
+  const { isScanning, devices, isBluetoothEnabled, startScan, stopScan, scanError } = useBluetooth();
   const { openTurnByTurnNavigation, calculateDistance } = useNavigation();
 
   useEffect(() => {
@@ -109,26 +109,11 @@ export default function CourseMapScreen() {
   };
 
   const startDeviceScanning = async () => {
-    if (!isBluetoothEnabled) {
+    if (Platform.OS === 'web') {
       Alert.alert(
-        'Bluetooth Required',
-        'Please enable Bluetooth to scan for nearby devices.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Open Settings', onPress: () => {
-            if (Platform.OS !== 'web') {
-              // Open Bluetooth settings
-              const settingsUrl = Platform.select({
-                ios: 'App-Prefs:Bluetooth',
-                android: 'android.settings.BLUETOOTH_SETTINGS',
-                default: '',
-              });
-              if (settingsUrl) {
-                // Linking.openSettings() or similar would go here
-              }
-            }
-          }},
-        ]
+        'Platform Not Supported',
+        'Bluetooth scanning is not available on web browsers. Please use the mobile app on iOS or Android.',
+        [{ text: 'OK' }]
       );
       return;
     }
@@ -136,18 +121,16 @@ export default function CourseMapScreen() {
     try {
       await startScan();
       
-      // Show scanning started message
-      const modeText = useDemoMode ? ' (Demo Mode)' : '';
       Alert.alert(
         '🔍 Bluetooth Scan Started',
-        `Scanning for nearby Bluetooth devices including golf balls, phones, and accessories...${modeText}`,
+        'Scanning for nearby Bluetooth devices including phones, watches, headphones, and smart golf equipment...',
         [{ text: 'OK' }]
       );
     } catch (error) {
       console.error('Scan start error:', error);
       Alert.alert(
         'Scan Error',
-        'Failed to start Bluetooth scan. Using demo mode instead.',
+        'Failed to start Bluetooth scan. Please check your Bluetooth settings and permissions.',
         [{ text: 'OK' }]
       );
     }
@@ -157,11 +140,11 @@ export default function CourseMapScreen() {
     setSelectedDevice(device);
     
     const distanceText = device.distance ? `${device.distance}m away` : 'Distance calculating...';
-    const deviceIcon = getDeviceIcon(device.type);
+    const deviceIcon = getDeviceEmoji(device.type);
     const signalStrength = Math.abs(device.rssi);
     
     Alert.alert(
-      `${getDeviceEmoji(device.type)} Navigate to ${device.name}`,
+      `${deviceIcon} Navigate to ${device.name}`,
       `Start turn-by-turn navigation?\n\n📍 ${distanceText}\n📶 Signal: ${signalStrength}dBm${device.hole ? `\n⛳ Hole ${device.hole}` : ''}`,
       [
         { text: 'Cancel', style: 'cancel' },
@@ -260,7 +243,7 @@ export default function CourseMapScreen() {
       >
         <Text style={styles.headerTitle}>GolfTrackerJack</Text>
         <Text style={styles.headerSubtitle}>
-          Bluetooth Device Tracking {useDemoMode && '(Demo Mode)'}
+          Real Bluetooth Device Tracking
         </Text>
       </LinearGradient>
 
@@ -294,6 +277,19 @@ export default function CourseMapScreen() {
           </LinearGradient>
         </View>
 
+        {/* Error Display */}
+        {scanError && (
+          <View style={styles.errorContainer}>
+            <LinearGradient
+              colors={['#EF4444', '#DC2626']}
+              style={styles.errorGradient}
+            >
+              <AlertCircle size={20} color="white" />
+              <Text style={styles.errorText}>{scanError}</Text>
+            </LinearGradient>
+          </View>
+        )}
+
         {/* Map Section with Device List */}
         <View style={styles.mapSection}>
           <LinearGradient
@@ -302,7 +298,7 @@ export default function CourseMapScreen() {
           >
             <View style={styles.mapHeader}>
               <Bluetooth size={32} color="white" />
-              <Text style={styles.mapTitle}>Bluetooth Tracking</Text>
+              <Text style={styles.mapTitle}>Real Bluetooth Tracking</Text>
               <Text style={styles.mapSubtitle}>
                 {location ? 
                   `GPS: ${location.coords.latitude.toFixed(4)}, ${location.coords.longitude.toFixed(4)}` :
@@ -311,7 +307,7 @@ export default function CourseMapScreen() {
               </Text>
               <Text style={styles.bluetoothStatus}>
                 Bluetooth: {isBluetoothEnabled ? '✅ Enabled' : '❌ Disabled'}
-                {useDemoMode && ' • Demo Mode Active'}
+                {Platform.OS === 'web' && ' • Web Not Supported'}
               </Text>
             </View>
             
@@ -356,12 +352,12 @@ export default function CourseMapScreen() {
               </View>
             )}
 
-            {trackedDevices.length === 0 && !isScanning && (
+            {trackedDevices.length === 0 && !isScanning && !scanError && (
               <View style={styles.emptyState}>
                 <Bluetooth size={48} color="rgba(255, 255, 255, 0.6)" />
                 <Text style={styles.emptyTitle}>No Devices Found</Text>
                 <Text style={styles.emptyText}>
-                  {useDemoMode ? 'Tap scan to see demo devices' : 'Scan for nearby Bluetooth devices'}
+                  Scan for nearby Bluetooth devices
                 </Text>
               </View>
             )}
@@ -371,7 +367,7 @@ export default function CourseMapScreen() {
                 <Search size={48} color="white" />
                 <Text style={styles.scanningTitle}>Scanning for Devices...</Text>
                 <Text style={styles.scanningText}>
-                  {useDemoMode ? 'Discovering demo devices...' : 'Looking for Bluetooth devices nearby'}
+                  Looking for Bluetooth devices nearby
                 </Text>
                 <TouchableOpacity style={styles.stopScanButton} onPress={stopScan}>
                   <Text style={styles.stopScanText}>Stop Scan</Text>
@@ -381,7 +377,7 @@ export default function CourseMapScreen() {
           </LinearGradient>
         </View>
 
-        {/* Stats Cards - Now in normal flow */}
+        {/* Stats Cards */}
         <View style={styles.statsGrid}>
           <LinearGradient
             colors={['#22C55E', '#16A34A']}
@@ -403,14 +399,14 @@ export default function CourseMapScreen() {
             <View style={styles.cardContent}>
               <Bluetooth size={20} color="white" />
               <View style={styles.cardText}>
-                <Text style={styles.cardTitle}>Mode</Text>
-                <Text style={styles.cardValue}>{useDemoMode ? 'DEMO' : 'LIVE'}</Text>
+                <Text style={styles.cardTitle}>Bluetooth</Text>
+                <Text style={styles.cardValue}>{isBluetoothEnabled ? 'ON' : 'OFF'}</Text>
               </View>
             </View>
           </LinearGradient>
         </View>
 
-        {/* Action Button - Now in normal flow */}
+        {/* Action Button */}
         <TouchableOpacity 
           style={[styles.actionButton, isScanning && styles.actionButtonDisabled]} 
           onPress={startDeviceScanning}
@@ -422,9 +418,7 @@ export default function CourseMapScreen() {
           >
             <Search size={20} color="white" />
             <Text style={styles.buttonText}>
-              {isScanning ? 'Scanning for Devices...' : 
-               useDemoMode ? 'Scan for Demo Devices' :
-               'Scan for Bluetooth Devices'}
+              {isScanning ? 'Scanning for Devices...' : 'Scan for Bluetooth Devices'}
             </Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -498,6 +492,23 @@ const styles = StyleSheet.create({
     color: '#22C55E',
     fontSize: 11,
     fontWeight: '600',
+  },
+  errorContainer: {
+    marginBottom: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  errorGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  errorText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
+    flex: 1,
   },
   mapSection: {
     height: 450,
