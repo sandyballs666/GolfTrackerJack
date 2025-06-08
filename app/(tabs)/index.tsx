@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Alert, TouchableOpacity, Platform, ScrollView } from 'react-native';
 import * as Location from 'expo-location';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Navigation, MapPin, Target, Compass, Timer, Bluetooth, Smartphone, Search, Wifi, Headphones, Watch, CircleAlert as AlertCircle, Settings } from 'lucide-react-native';
+import { Navigation, MapPin, Target, Compass, Timer, Bluetooth, Smartphone, Search, Wifi, Headphones, Watch, CircleAlert as AlertCircle, Settings, Globe } from 'lucide-react-native';
 import { useBluetooth, BluetoothDevice } from '@/hooks/useBluetooth';
 import { useNavigation, NavigationCoordinate } from '@/hooks/useNavigation';
 
@@ -125,15 +125,6 @@ export default function CourseMapScreen() {
   };
 
   const startDeviceScanning = async () => {
-    if (Platform.OS === 'web') {
-      Alert.alert(
-        'Platform Not Supported',
-        'Real Bluetooth scanning requires a native mobile app on iOS or Android.\n\nTo use this feature:\n1. Build the app for iOS/Android\n2. Install on a physical device\n3. Grant Bluetooth permissions',
-        [{ text: 'OK' }]
-      );
-      return;
-    }
-
     try {
       await startScan();
     } catch (error) {
@@ -245,6 +236,26 @@ export default function CourseMapScreen() {
     return `${diffHours}h ${diffMins % 60}m ago`;
   };
 
+  const getPlatformInfo = () => {
+    if (Platform.OS === 'web') {
+      return {
+        icon: Globe,
+        title: 'Web Bluetooth Available',
+        subtitle: 'Click scan to use Web Bluetooth API',
+        color: '#3B82F6'
+      };
+    }
+    return {
+      icon: Smartphone,
+      title: 'Native Bluetooth Ready',
+      subtitle: 'Tap scan for device discovery',
+      color: '#22C55E'
+    };
+  };
+
+  const platformInfo = getPlatformInfo();
+  const PlatformIcon = platformInfo.icon;
+
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -307,8 +318,8 @@ export default function CourseMapScreen() {
             style={styles.mapGradient}
           >
             <View style={styles.mapHeader}>
-              <Bluetooth size={32} color="white" />
-              <Text style={styles.mapTitle}>Real Bluetooth Tracking</Text>
+              <PlatformIcon size={32} color="white" />
+              <Text style={styles.mapTitle}>{platformInfo.title}</Text>
               <Text style={styles.mapSubtitle}>
                 {location ? 
                   `GPS: ${location.coords.latitude.toFixed(4)}, ${location.coords.longitude.toFixed(4)}` :
@@ -316,8 +327,8 @@ export default function CourseMapScreen() {
                 }
               </Text>
               <Text style={styles.bluetoothStatus}>
-                Bluetooth: {isBluetoothEnabled ? '✅ Enabled' : '❌ Disabled'}
-                {Platform.OS === 'web' && ' • Web Not Supported'}
+                Bluetooth: {isBluetoothEnabled ? '✅ Ready' : '❌ Not Available'}
+                {Platform.OS === 'web' && ' • Web Bluetooth API'}
               </Text>
             </View>
             
@@ -367,7 +378,7 @@ export default function CourseMapScreen() {
                 <Bluetooth size={48} color="rgba(255, 255, 255, 0.6)" />
                 <Text style={styles.emptyTitle}>No Devices Found</Text>
                 <Text style={styles.emptyText}>
-                  Scan for nearby Bluetooth devices
+                  {Platform.OS === 'web' ? 'Use Web Bluetooth to discover devices' : 'Scan for nearby Bluetooth devices'}
                 </Text>
               </View>
             )}
@@ -375,9 +386,11 @@ export default function CourseMapScreen() {
             {isScanning && (
               <View style={styles.scanningState}>
                 <Search size={48} color="white" />
-                <Text style={styles.scanningTitle}>Scanning for Real Devices...</Text>
+                <Text style={styles.scanningTitle}>
+                  {Platform.OS === 'web' ? 'Web Bluetooth Scanning...' : 'Scanning for Devices...'}
+                </Text>
                 <Text style={styles.scanningText}>
-                  Looking for nearby Bluetooth devices
+                  {Platform.OS === 'web' ? 'Select a device from the browser dialog' : 'Looking for nearby Bluetooth devices'}
                 </Text>
                 <TouchableOpacity style={styles.stopScanButton} onPress={stopScan}>
                   <Text style={styles.stopScanText}>Stop Scan</Text>
@@ -428,29 +441,32 @@ export default function CourseMapScreen() {
           >
             <Search size={20} color="white" />
             <Text style={styles.buttonText}>
-              {isScanning ? 'Scanning for Real Devices...' : 'Scan for Bluetooth Devices'}
+              {isScanning ? 
+                (Platform.OS === 'web' ? 'Web Bluetooth Scanning...' : 'Scanning for Devices...') : 
+                (Platform.OS === 'web' ? 'Scan with Web Bluetooth' : 'Scan for Bluetooth Devices')
+              }
             </Text>
           </LinearGradient>
         </TouchableOpacity>
 
-        {/* Development Build Notice */}
-        {Platform.OS !== 'web' && (
-          <View style={styles.noticeCard}>
-            <LinearGradient
-              colors={['#1F2937', '#374151']}
-              style={styles.noticeGradient}
-            >
-              <Settings size={24} color="#3B82F6" />
-              <View style={styles.noticeContent}>
-                <Text style={styles.noticeTitle}>Development Build Required</Text>
-                <Text style={styles.noticeText}>
-                  For real Bluetooth scanning, you need a development build with react-native-ble-manager. 
-                  This enables scanning for actual nearby devices like phones, watches, headphones, and smart golf equipment.
-                </Text>
-              </View>
-            </LinearGradient>
-          </View>
-        )}
+        {/* Platform-specific Notice */}
+        <View style={styles.noticeCard}>
+          <LinearGradient
+            colors={['#1F2937', '#374151']}
+            style={styles.noticeGradient}
+          >
+            <PlatformIcon size={24} color={platformInfo.color} />
+            <View style={styles.noticeContent}>
+              <Text style={styles.noticeTitle}>{platformInfo.title}</Text>
+              <Text style={styles.noticeText}>
+                {Platform.OS === 'web' ? 
+                  'This app uses the Web Bluetooth API to discover nearby devices. Click "Scan" to open the browser\'s device selection dialog. Works great for finding phones, headphones, and smart devices!' :
+                  'For full native Bluetooth scanning with react-native-ble-manager, you\'ll need a custom development build. The current implementation provides device discovery and turn-by-turn navigation to help you find your golf equipment!'
+                }
+              </Text>
+            </View>
+          </LinearGradient>
+        </View>
       </ScrollView>
     </View>
   );

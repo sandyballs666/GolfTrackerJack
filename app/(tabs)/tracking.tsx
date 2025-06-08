@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Target, Navigation, Trash2, Clock, MapPin, Bluetooth, Search, Smartphone, Headphones, Watch, CircleAlert as AlertCircle, Settings } from 'lucide-react-native';
+import { Target, Navigation, Trash2, Clock, MapPin, Bluetooth, Search, Smartphone, Headphones, Watch, CircleAlert as AlertCircle, Settings, Globe } from 'lucide-react-native';
 import { useBluetooth, BluetoothDevice } from '@/hooks/useBluetooth';
 import { useNavigation, NavigationCoordinate } from '@/hooks/useNavigation';
 import * as Location from 'expo-location';
@@ -113,15 +113,6 @@ export default function BallTrackingScreen() {
   };
 
   const startDeviceScanning = async () => {
-    if (Platform.OS === 'web') {
-      Alert.alert(
-        'Platform Not Supported',
-        'Real Bluetooth scanning requires a native mobile app on iOS or Android.\n\nTo use this feature:\n1. Build the app for iOS/Android\n2. Install on a physical device\n3. Grant Bluetooth permissions',
-        [{ text: 'OK' }]
-      );
-      return;
-    }
-
     try {
       await startScan();
     } catch (error) {
@@ -224,6 +215,26 @@ export default function BallTrackingScreen() {
     return '#6B7280'; // Very weak signal
   };
 
+  const getPlatformInfo = () => {
+    if (Platform.OS === 'web') {
+      return {
+        icon: Globe,
+        title: 'Web Bluetooth Tracking',
+        subtitle: 'Browser-based device discovery',
+        color: '#3B82F6'
+      };
+    }
+    return {
+      icon: Smartphone,
+      title: 'Native Bluetooth Tracking',
+      subtitle: 'Mobile device discovery',
+      color: '#22C55E'
+    };
+  };
+
+  const platformInfo = getPlatformInfo();
+  const PlatformIcon = platformInfo.icon;
+
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -287,7 +298,10 @@ export default function BallTrackingScreen() {
           >
             <Search size={20} color="white" />
             <Text style={styles.scanButtonText}>
-              {isScanning ? 'Scanning for Real Devices...' : 'Scan for Bluetooth Devices'}
+              {isScanning ? 
+                (Platform.OS === 'web' ? 'Web Bluetooth Scanning...' : 'Scanning for Devices...') : 
+                (Platform.OS === 'web' ? 'Scan with Web Bluetooth' : 'Scan for Bluetooth Devices')
+              }
             </Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -295,7 +309,7 @@ export default function BallTrackingScreen() {
         {/* Device List */}
         <View style={styles.devicesList}>
           <Text style={styles.sectionTitle}>
-            {isScanning ? 'Discovering Real Devices...' : 'Tracked Devices'}
+            {isScanning ? 'Discovering Devices...' : 'Tracked Devices'}
           </Text>
           
           {trackedDevices.length === 0 && !isScanning && !scanError ? (
@@ -303,7 +317,7 @@ export default function BallTrackingScreen() {
               <Target size={48} color="#6B7280" />
               <Text style={styles.emptyText}>No devices tracked yet</Text>
               <Text style={styles.emptySubtext}>
-                Scan for nearby Bluetooth devices
+                {Platform.OS === 'web' ? 'Use Web Bluetooth to discover devices' : 'Scan for nearby Bluetooth devices'}
               </Text>
             </View>
           ) : (
@@ -380,36 +394,36 @@ export default function BallTrackingScreen() {
             colors={['#1F2937', '#374151']}
             style={styles.instructionsGradient}
           >
-            <Text style={styles.instructionsTitle}>How to Use Real Bluetooth Tracking</Text>
+            <Text style={styles.instructionsTitle}>
+              {Platform.OS === 'web' ? 'Web Bluetooth Tracking' : 'Bluetooth Device Tracking'}
+            </Text>
             <Text style={styles.instructionsText}>
-              1. Tap "Scan" to discover nearby real Bluetooth devices{'\n'}
-              2. Tap the navigation icon to get turn-by-turn walking directions{'\n'}
-              3. Long press a device to stop tracking it{'\n'}
-              4. Works with golf balls, phones, watches, headphones, and more!{'\n\n'}
-              📱 Requires development build with react-native-ble-manager
+              {Platform.OS === 'web' ? 
+                '1. Click "Scan" to open browser device selection\n2. Choose a nearby Bluetooth device\n3. Tap navigation icon for turn-by-turn directions\n4. Works with phones, headphones, watches, and more!\n\n🌐 Uses Web Bluetooth API for device discovery' :
+                '1. Tap "Scan" to discover nearby real Bluetooth devices\n2. Tap the navigation icon to get turn-by-turn walking directions\n3. Long press a device to stop tracking it\n4. Works with golf balls, phones, watches, headphones, and more!\n\n📱 For full native scanning, use a development build'
+              }
             </Text>
           </LinearGradient>
         </View>
 
-        {/* Development Build Notice */}
-        {Platform.OS !== 'web' && (
-          <View style={styles.noticeCard}>
-            <LinearGradient
-              colors={['#1F2937', '#374151']}
-              style={styles.noticeGradient}
-            >
-              <Settings size={24} color="#3B82F6" />
-              <View style={styles.noticeContent}>
-                <Text style={styles.noticeTitle}>Real Bluetooth Scanning</Text>
-                <Text style={styles.noticeText}>
-                  This app scans for actual nearby Bluetooth devices including phones, watches, headphones, 
-                  and smart golf equipment. For full functionality, ensure you have a development build 
-                  with react-native-ble-manager installed.
-                </Text>
-              </View>
-            </LinearGradient>
-          </View>
-        )}
+        {/* Platform-specific Notice */}
+        <View style={styles.noticeCard}>
+          <LinearGradient
+            colors={['#1F2937', '#374151']}
+            style={styles.noticeGradient}
+          >
+            <PlatformIcon size={24} color={platformInfo.color} />
+            <View style={styles.noticeContent}>
+              <Text style={styles.noticeTitle}>{platformInfo.title}</Text>
+              <Text style={styles.noticeText}>
+                {Platform.OS === 'web' ? 
+                  'This app uses the Web Bluetooth API to discover and track nearby devices. Perfect for finding phones, headphones, watches, and smart golf equipment. Click scan to open your browser\'s device selection dialog!' :
+                  'This app can discover actual nearby Bluetooth devices including phones, watches, headphones, and smart golf equipment. For full native functionality with react-native-ble-manager, you\'ll need a development build.'
+                }
+              </Text>
+            </View>
+          </LinearGradient>
+        </View>
       </ScrollView>
     </View>
   );
