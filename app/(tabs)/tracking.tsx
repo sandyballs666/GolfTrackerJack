@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Target, Navigation, Trash2, Clock, MapPin, Bluetooth, Search, Smartphone, Headphones, Watch, CircleAlert as AlertCircle, Settings, Globe } from 'lucide-react-native';
+import { Target, Navigation, Trash2, Clock, MapPin, Bluetooth, Search, Smartphone, Headphones, Watch, CircleAlert as AlertCircle, Settings, Globe, Zap } from 'lucide-react-native';
 import { useBluetooth, BluetoothDevice } from '@/hooks/useBluetooth';
 import { useNavigation, NavigationCoordinate } from '@/hooks/useNavigation';
 import * as Location from 'expo-location';
@@ -220,15 +220,15 @@ export default function BallTrackingScreen() {
       return {
         icon: Globe,
         title: 'Web Bluetooth Tracking',
-        subtitle: 'Browser-based device discovery',
+        subtitle: 'Real device discovery available',
         color: '#3B82F6'
       };
     }
     return {
       icon: Smartphone,
       title: 'Native Bluetooth Tracking',
-      subtitle: 'Mobile device discovery',
-      color: '#22C55E'
+      subtitle: 'Development build required',
+      color: '#F59E0B'
     };
   };
 
@@ -270,7 +270,7 @@ export default function BallTrackingScreen() {
             <Target size={24} color="white" />
             <View style={styles.statText}>
               <Text style={styles.statValue}>{trackedDevices.length}</Text>
-              <Text style={styles.statLabel}>Tracked Devices</Text>
+              <Text style={styles.statLabel}>Real Devices</Text>
             </View>
           </LinearGradient>
 
@@ -299,8 +299,8 @@ export default function BallTrackingScreen() {
             <Search size={20} color="white" />
             <Text style={styles.scanButtonText}>
               {isScanning ? 
-                (Platform.OS === 'web' ? 'Web Bluetooth Scanning...' : 'Scanning for Devices...') : 
-                (Platform.OS === 'web' ? 'Scan with Web Bluetooth' : 'Scan for Bluetooth Devices')
+                (Platform.OS === 'web' ? 'Scanning Real Devices...' : 'Scanning for Devices...') : 
+                (Platform.OS === 'web' ? 'Scan for Real Devices' : 'Scan for Bluetooth Devices')
               }
             </Text>
           </LinearGradient>
@@ -309,15 +309,15 @@ export default function BallTrackingScreen() {
         {/* Device List */}
         <View style={styles.devicesList}>
           <Text style={styles.sectionTitle}>
-            {isScanning ? 'Discovering Devices...' : 'Tracked Devices'}
+            {isScanning ? 'Discovering Real Devices...' : 'Tracked Devices'}
           </Text>
           
           {trackedDevices.length === 0 && !isScanning && !scanError ? (
             <View style={styles.emptyState}>
               <Target size={48} color="#6B7280" />
-              <Text style={styles.emptyText}>No devices tracked yet</Text>
+              <Text style={styles.emptyText}>No real devices tracked yet</Text>
               <Text style={styles.emptySubtext}>
-                {Platform.OS === 'web' ? 'Use Web Bluetooth to discover devices' : 'Scan for nearby Bluetooth devices'}
+                {Platform.OS === 'web' ? 'Use Web Bluetooth to discover real nearby devices' : 'Scan for nearby Bluetooth devices'}
               </Text>
             </View>
           ) : (
@@ -395,12 +395,12 @@ export default function BallTrackingScreen() {
             style={styles.instructionsGradient}
           >
             <Text style={styles.instructionsTitle}>
-              {Platform.OS === 'web' ? 'Web Bluetooth Tracking' : 'Bluetooth Device Tracking'}
+              {Platform.OS === 'web' ? 'Real Web Bluetooth Tracking' : 'Bluetooth Device Tracking'}
             </Text>
             <Text style={styles.instructionsText}>
               {Platform.OS === 'web' ? 
-                '1. Click "Scan" to open browser device selection\n2. Choose a nearby Bluetooth device\n3. Tap navigation icon for turn-by-turn directions\n4. Works with phones, headphones, watches, and more!\n\n🌐 Uses Web Bluetooth API for device discovery' :
-                '1. Tap "Scan" to discover nearby real Bluetooth devices\n2. Tap the navigation icon to get turn-by-turn walking directions\n3. Long press a device to stop tracking it\n4. Works with golf balls, phones, watches, headphones, and more!\n\n📱 For full native scanning, use a development build'
+                '1. Click "Scan" to open browser device selection\n2. Choose a REAL nearby Bluetooth device\n3. Tap navigation icon for turn-by-turn directions\n4. Works with actual phones, headphones, watches!\n\n🌐 Uses Web Bluetooth API for real device discovery' :
+                '1. Tap "Scan" to discover nearby real Bluetooth devices\n2. Tap the navigation icon to get turn-by-turn walking directions\n3. Long press a device to stop tracking it\n4. Works with golf balls, phones, watches, headphones!\n\n📱 For full native scanning, create an EAS development build'
               }
             </Text>
           </LinearGradient>
@@ -417,13 +417,34 @@ export default function BallTrackingScreen() {
               <Text style={styles.noticeTitle}>{platformInfo.title}</Text>
               <Text style={styles.noticeText}>
                 {Platform.OS === 'web' ? 
-                  'This app uses the Web Bluetooth API to discover and track nearby devices. Perfect for finding phones, headphones, watches, and smart golf equipment. Click scan to open your browser\'s device selection dialog!' :
-                  'This app can discover actual nearby Bluetooth devices including phones, watches, headphones, and smart golf equipment. For full native functionality with react-native-ble-manager, you\'ll need a development build.'
+                  '🌐 This app uses the Web Bluetooth API to discover and track REAL nearby devices. Perfect for finding phones, headphones, watches, and smart golf equipment. Click scan to open your browser\'s device selection dialog and choose from actual Bluetooth devices around you!' :
+                  '📱 This app can discover actual nearby Bluetooth devices including phones, watches, headphones, and smart golf equipment. For full native functionality with react-native-ble-manager, you\'ll need an EAS development build.'
                 }
               </Text>
             </View>
           </LinearGradient>
         </View>
+
+        {/* Web Bluetooth Feature Highlight */}
+        {Platform.OS === 'web' && (
+          <View style={styles.featureCard}>
+            <LinearGradient
+              colors={['#22C55E', '#16A34A']}
+              style={styles.featureGradient}
+            >
+              <Zap size={28} color="white" />
+              <View style={styles.featureContent}>
+                <Text style={styles.featureTitle}>Real Device Discovery</Text>
+                <Text style={styles.featureText}>
+                  ✅ Discover actual nearby Bluetooth devices{'\n'}
+                  ✅ Turn-by-turn navigation to any device{'\n'}
+                  ✅ Works with phones, headphones, watches{'\n'}
+                  ✅ Perfect for finding lost golf equipment
+                </Text>
+              </View>
+            </LinearGradient>
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -649,7 +670,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   noticeCard: {
-    marginBottom: 40,
+    marginBottom: 20,
     borderRadius: 16,
     overflow: 'hidden',
   },
@@ -671,6 +692,31 @@ const styles = StyleSheet.create({
   noticeText: {
     fontSize: 14,
     color: '#9CA3AF',
+    lineHeight: 20,
+  },
+  featureCard: {
+    marginBottom: 40,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  featureGradient: {
+    flexDirection: 'row',
+    padding: 20,
+    alignItems: 'flex-start',
+  },
+  featureContent: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  featureTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: 12,
+  },
+  featureText: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.9)',
     lineHeight: 20,
   },
 });

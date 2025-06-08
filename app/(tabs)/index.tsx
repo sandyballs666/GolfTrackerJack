@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Alert, TouchableOpacity, Platform, ScrollView } from 'react-native';
 import * as Location from 'expo-location';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Navigation, MapPin, Target, Compass, Timer, Bluetooth, Smartphone, Search, Wifi, Headphones, Watch, CircleAlert as AlertCircle, Settings, Globe } from 'lucide-react-native';
+import { Navigation, MapPin, Target, Compass, Timer, Bluetooth, Smartphone, Search, Wifi, Headphones, Watch, CircleAlert as AlertCircle, Settings, Globe, Zap } from 'lucide-react-native';
 import { useBluetooth, BluetoothDevice } from '@/hooks/useBluetooth';
 import { useNavigation, NavigationCoordinate } from '@/hooks/useNavigation';
 
@@ -240,16 +240,16 @@ export default function CourseMapScreen() {
     if (Platform.OS === 'web') {
       return {
         icon: Globe,
-        title: 'Web Bluetooth Available',
-        subtitle: 'Click scan to use Web Bluetooth API',
+        title: 'Web Bluetooth Ready',
+        subtitle: 'Real device discovery available',
         color: '#3B82F6'
       };
     }
     return {
       icon: Smartphone,
       title: 'Native Bluetooth Ready',
-      subtitle: 'Tap scan for device discovery',
-      color: '#22C55E'
+      subtitle: 'Development build required for real scanning',
+      color: '#F59E0B'
     };
   };
 
@@ -335,7 +335,7 @@ export default function CourseMapScreen() {
             {/* Tracked Devices List */}
             {trackedDevices.length > 0 && (
               <View style={styles.devicesContainer}>
-                <Text style={styles.devicesTitle}>Discovered Devices ({trackedDevices.length}):</Text>
+                <Text style={styles.devicesTitle}>Real Devices Found ({trackedDevices.length}):</Text>
                 <ScrollView style={styles.devicesList} nestedScrollEnabled={true}>
                   {trackedDevices.map((device) => {
                     const DeviceIcon = getDeviceIcon(device.type);
@@ -376,9 +376,9 @@ export default function CourseMapScreen() {
             {trackedDevices.length === 0 && !isScanning && !scanError && (
               <View style={styles.emptyState}>
                 <Bluetooth size={48} color="rgba(255, 255, 255, 0.6)" />
-                <Text style={styles.emptyTitle}>No Devices Found</Text>
+                <Text style={styles.emptyTitle}>No Real Devices Found</Text>
                 <Text style={styles.emptyText}>
-                  {Platform.OS === 'web' ? 'Use Web Bluetooth to discover devices' : 'Scan for nearby Bluetooth devices'}
+                  {Platform.OS === 'web' ? 'Click scan to discover real nearby Bluetooth devices' : 'Tap scan to find nearby devices'}
                 </Text>
               </View>
             )}
@@ -387,10 +387,10 @@ export default function CourseMapScreen() {
               <View style={styles.scanningState}>
                 <Search size={48} color="white" />
                 <Text style={styles.scanningTitle}>
-                  {Platform.OS === 'web' ? 'Web Bluetooth Scanning...' : 'Scanning for Devices...'}
+                  {Platform.OS === 'web' ? 'Scanning for Real Devices...' : 'Scanning for Devices...'}
                 </Text>
                 <Text style={styles.scanningText}>
-                  {Platform.OS === 'web' ? 'Select a device from the browser dialog' : 'Looking for nearby Bluetooth devices'}
+                  {Platform.OS === 'web' ? 'Select a real device from the browser dialog' : 'Looking for nearby Bluetooth devices'}
                 </Text>
                 <TouchableOpacity style={styles.stopScanButton} onPress={stopScan}>
                   <Text style={styles.stopScanText}>Stop Scan</Text>
@@ -409,7 +409,7 @@ export default function CourseMapScreen() {
             <View style={styles.cardContent}>
               <Target size={20} color="white" />
               <View style={styles.cardText}>
-                <Text style={styles.cardTitle}>Devices Found</Text>
+                <Text style={styles.cardTitle}>Real Devices</Text>
                 <Text style={styles.cardValue}>{trackedDevices.length}</Text>
               </View>
             </View>
@@ -442,8 +442,8 @@ export default function CourseMapScreen() {
             <Search size={20} color="white" />
             <Text style={styles.buttonText}>
               {isScanning ? 
-                (Platform.OS === 'web' ? 'Web Bluetooth Scanning...' : 'Scanning for Devices...') : 
-                (Platform.OS === 'web' ? 'Scan with Web Bluetooth' : 'Scan for Bluetooth Devices')
+                (Platform.OS === 'web' ? 'Scanning Real Devices...' : 'Scanning for Devices...') : 
+                (Platform.OS === 'web' ? 'Scan for Real Devices' : 'Scan for Bluetooth Devices')
               }
             </Text>
           </LinearGradient>
@@ -460,13 +460,34 @@ export default function CourseMapScreen() {
               <Text style={styles.noticeTitle}>{platformInfo.title}</Text>
               <Text style={styles.noticeText}>
                 {Platform.OS === 'web' ? 
-                  'This app uses the Web Bluetooth API to discover nearby devices. Click "Scan" to open the browser\'s device selection dialog. Works great for finding phones, headphones, and smart devices!' :
-                  'For full native Bluetooth scanning with react-native-ble-manager, you\'ll need a custom development build. The current implementation provides device discovery and turn-by-turn navigation to help you find your golf equipment!'
+                  '🌐 This app uses the Web Bluetooth API to discover REAL nearby devices. Click "Scan" to open your browser\'s device selection dialog and choose from actual Bluetooth devices around you - phones, headphones, watches, and smart golf equipment!' :
+                  '📱 For real Bluetooth scanning on mobile, create an EAS development build with react-native-ble-manager. The current Expo Go environment has limitations, but the app provides turn-by-turn navigation to help you find your golf equipment!'
                 }
               </Text>
             </View>
           </LinearGradient>
         </View>
+
+        {/* Web Bluetooth Feature Highlight */}
+        {Platform.OS === 'web' && (
+          <View style={styles.featureCard}>
+            <LinearGradient
+              colors={['#3B82F6', '#2563EB']}
+              style={styles.featureGradient}
+            >
+              <Zap size={28} color="white" />
+              <View style={styles.featureContent}>
+                <Text style={styles.featureTitle}>Real Device Discovery</Text>
+                <Text style={styles.featureText}>
+                  ✅ Discover actual nearby Bluetooth devices{'\n'}
+                  ✅ Turn-by-turn navigation to any device{'\n'}
+                  ✅ Works with phones, headphones, watches{'\n'}
+                  ✅ Perfect for finding lost golf equipment
+                </Text>
+              </View>
+            </LinearGradient>
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -762,7 +783,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   noticeCard: {
-    marginBottom: 40,
+    marginBottom: 20,
     borderRadius: 16,
     overflow: 'hidden',
   },
@@ -784,6 +805,31 @@ const styles = StyleSheet.create({
   noticeText: {
     fontSize: 14,
     color: '#9CA3AF',
+    lineHeight: 20,
+  },
+  featureCard: {
+    marginBottom: 40,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  featureGradient: {
+    flexDirection: 'row',
+    padding: 20,
+    alignItems: 'flex-start',
+  },
+  featureContent: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  featureTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: 12,
+  },
+  featureText: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.9)',
     lineHeight: 20,
   },
 });
