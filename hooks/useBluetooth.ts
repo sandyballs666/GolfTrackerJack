@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Platform, Alert } from 'react-native';
+import { useNativeBluetooth } from './useNativeBluetooth';
 
 export interface BluetoothDevice {
   id: string;
@@ -18,32 +19,54 @@ export function useBluetooth() {
   const [isBluetoothEnabled, setIsBluetoothEnabled] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
 
+  // Use native Bluetooth hook for mobile platforms
+  const nativeBluetooth = useNativeBluetooth();
+
   useEffect(() => {
-    initializeBluetooth();
+    if (Platform.OS === 'web') {
+      initializeWebBluetooth();
+    }
   }, []);
 
-  const initializeBluetooth = async () => {
-    if (Platform.OS === 'web') {
-      // Check for Web Bluetooth API support
-      if ('bluetooth' in navigator) {
-        setIsBluetoothEnabled(true);
-        setScanError(null);
-        console.log('✅ Web Bluetooth API available');
-      } else {
-        setScanError('Web Bluetooth API not supported in this browser. Try Chrome or Edge.');
-        setIsBluetoothEnabled(false);
-      }
-      return;
+  // For native platforms, use the native Bluetooth hook
+  useEffect(() => {
+    if (Platform.OS !== 'web') {
+      setIsScanning(nativeBluetooth.isScanning);
+      setDevices(nativeBluetooth.devices);
+      setIsBluetoothEnabled(nativeBluetooth.isBluetoothEnabled);
+      setScanError(nativeBluetooth.scanError);
     }
+  }, [
+    nativeBluetooth.isScanning,
+    nativeBluetooth.devices,
+    nativeBluetooth.isBluetoothEnabled,
+    nativeBluetooth.scanError
+  ]);
 
-    // For native platforms in Expo Go, we can't access real Bluetooth
-    // But we'll prepare for when they create a development build
-    setIsBluetoothEnabled(true);
-    setScanError(null);
-    console.log('✅ Bluetooth ready for development build');
+  const initializeWebBluetooth = async () => {
+    if ('bluetooth' in navigator) {
+      setIsBluetoothEnabled(true);
+      setScanError(null);
+      console.log('✅ Web Bluetooth API available');
+    } else {
+      setScanError('Web Bluetooth API not supported in this browser. Try Chrome or Edge.');
+      setIsBluetoothEnabled(false);
+    }
   };
 
   const startScan = async (): Promise<void> => {
+    if (Platform.OS === 'web') {
+      await startWebBluetoothScan();
+    } else {
+      if (nativeBluetooth.isNativeBluetoothAvailable) {
+        await nativeBluetooth.startScan();
+      } else {
+        showDevelopmentBuildInstructions();
+      }
+    }
+  };
+
+  const startWebBluetoothScan = async () => {
     if (isScanning) return;
 
     setScanError(null);
@@ -51,27 +74,12 @@ export function useBluetooth() {
     setDevices([]);
 
     try {
-      if (Platform.OS === 'web') {
-        await startWebBluetoothScan();
-      } else {
-        await startNativeBluetoothScan();
-      }
-    } catch (error) {
-      console.error('Bluetooth scan error:', error);
-      setScanError('Failed to start Bluetooth scan');
-      setIsScanning(false);
-    }
-  };
-
-  const startWebBluetoothScan = async () => {
-    try {
       if (!('bluetooth' in navigator)) {
         throw new Error('Web Bluetooth not supported');
       }
 
       console.log('🔍 Starting Web Bluetooth scan...');
 
-      // Request device with broad service filters to find more devices
       const device = await (navigator as any).bluetooth.requestDevice({
         acceptAllDevices: true,
         optionalServices: [
@@ -81,20 +89,18 @@ export function useBluetooth() {
           'generic_attribute',
           'heart_rate',
           'human_interface_device',
-          '0000180f-0000-1000-8000-00805f9b34fb', // Battery Service
-          '0000180a-0000-1000-8000-00805f9b34fb', // Device Information
+          '0000180f-0000-1000-8000-00805f9b34fb',
+          '0000180a-0000-1000-8000-00805f9b34fb',
         ]
       });
 
       if (device) {
-        // Try to connect to get more information
-        let rssi = -50; // Default RSSI since Web Bluetooth doesn't provide it
+        let rssi = -50;
         let services: string[] = [];
 
         try {
           const server = await device.gatt?.connect();
           if (server) {
-            // Try to get available services
             const primaryServices = await server.getPrimaryServices();
             services = primaryServices.map(service => service.uuid);
             console.log('📡 Connected to device, found services:', services);
@@ -138,74 +144,33 @@ export function useBluetooth() {
     }
   };
 
-  const startNativeBluetoothScan = async () => {
-    // Check if we're in Expo Go vs development build
-    const isExpoGo = __DEV__ && !process.env.EXPO_CUSTOM_BUILD;
-    
-    if (isExpoGo) {
-      Alert.alert(
-        '📱 Real Bluetooth Scanning Requires Development Build',
-        'To scan for real Bluetooth devices on mobile:\n\n' +
-        '1. Create an EAS development build\n' +
-        '2. Install react-native-ble-manager\n' +
-        '3. Add Bluetooth permissions\n\n' +
-        'Current Expo Go limitations prevent real device scanning.\n\n' +
-        'Would you like to see the setup instructions?',
-        [
-          { text: 'Cancel', style: 'cancel', onPress: () => setIsScanning(false) },
-          { 
-            text: 'Show Instructions', 
-            onPress: () => {
-              setIsScanning(false);
-              showDevelopmentBuildInstructions();
-            }
-          }
-        ]
-      );
-      return;
-    }
-
-    // If we're in a development build, try to use react-native-ble-manager
-    try {
-      // This would be the real implementation with react-native-ble-manager
-      // const BleManager = require('react-native-ble-manager');
-      // await BleManager.start();
-      // await BleManager.scan([], 10, true);
-      
-      setScanError('Development build detected but react-native-ble-manager not configured');
-      setIsScanning(false);
-    } catch (error) {
-      setScanError('Native Bluetooth scanning not available');
-      setIsScanning(false);
-    }
-  };
-
   const showDevelopmentBuildInstructions = () => {
     Alert.alert(
-      '🛠️ Development Build Setup',
-      'To enable real Bluetooth scanning:\n\n' +
-      '1. Run: eas build --profile development\n' +
-      '2. Install: npm install react-native-ble-manager\n' +
-      '3. Add to app.json plugins:\n' +
-      '   ["react-native-ble-manager"]\n' +
-      '4. Add permissions to app.json\n' +
-      '5. Rebuild and install on device\n\n' +
-      'Then you\'ll have full native Bluetooth access!',
+      '🛠️ Development Build Required',
+      'To scan for real Bluetooth devices on mobile:\n\n' +
+      '1. Install EAS CLI: npm install -g @expo/cli\n' +
+      '2. Run: eas build --profile development\n' +
+      '3. Install the generated APK/IPA on your device\n' +
+      '4. Open the app from the development build\n\n' +
+      'The development build includes react-native-ble-manager for real device scanning!',
       [{ text: 'Got it!' }]
     );
   };
 
   const stopScan = async (): Promise<void> => {
-    setIsScanning(false);
-    console.log('⏹️ Bluetooth scan stopped');
+    if (Platform.OS === 'web') {
+      setIsScanning(false);
+      console.log('⏹️ Web Bluetooth scan stopped');
+    } else {
+      await nativeBluetooth.stopScan();
+    }
   };
 
   const checkBluetoothState = async () => {
     if (Platform.OS === 'web') {
       setIsBluetoothEnabled('bluetooth' in navigator);
-    } else {
-      setIsBluetoothEnabled(true);
     }
+    // Native state is handled by the native hook
   };
 
   return {
