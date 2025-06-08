@@ -36,7 +36,9 @@ export function useBluetooth() {
       return;
     }
 
-    // For native platforms, we'll use Expo's built-in capabilities
+    // For native platforms, we'll use a different approach
+    // Since react-native-ble-manager requires native code, we'll implement
+    // a solution that works with Expo's managed workflow
     setIsBluetoothEnabled(true);
     setScanError(null);
     console.log('✅ Bluetooth initialized for native platform');
@@ -101,97 +103,65 @@ export function useBluetooth() {
   };
 
   const startNativeBluetoothScan = async () => {
-    // For native platforms, we need to use a different approach
-    // Since we're in Expo managed workflow, we'll use the device's native capabilities
-    
-    try {
-      // Check if we can access native Bluetooth
-      if (Platform.OS === 'android' || Platform.OS === 'ios') {
-        // Use Expo's device scanning capabilities
-        await scanForNearbyDevices();
-      }
-    } catch (error) {
-      console.error('Native Bluetooth scan error:', error);
-      // Fallback to simulated devices for demonstration
-      await simulateDeviceDiscovery();
-    }
-  };
+    // For native platforms without react-native-ble-manager,
+    // we'll simulate device discovery for demonstration
+    // In a real app, you'd need to eject from Expo or use a custom development build
 
-  const scanForNearbyDevices = async () => {
-    // This would use native Bluetooth scanning in a development build
-    // For now, we'll simulate real device discovery
-    const realDevices: BluetoothDevice[] = [
-      {
-        id: 'real-device-1',
-        name: 'Nearby Phone',
-        rssi: -45,
-        advertising: { localName: 'Smartphone' }
-      },
-      {
-        id: 'real-device-2', 
-        name: 'Bluetooth Headphones',
-        rssi: -38,
-        advertising: { localName: 'Audio Device' }
-      },
-      {
-        id: 'real-device-3',
-        name: 'Smart Watch',
-        rssi: -52,
-        advertising: { localName: 'Wearable' }
-      }
-    ];
-
-    // Simulate gradual discovery
-    for (let i = 0; i < realDevices.length; i++) {
-      setTimeout(() => {
-        setDevices(prev => [...prev, realDevices[i]]);
-        console.log(`📱 Real device discovered: ${realDevices[i].name}`);
-        
-        if (i === realDevices.length - 1) {
-          setTimeout(() => setIsScanning(false), 1000);
-        }
-      }, (i + 1) * 1500);
-    }
+    Alert.alert(
+      '📱 Native Bluetooth Scanning',
+      'To scan for real Bluetooth devices on mobile, this app needs:\n\n1. A custom development build (not Expo Go)\n2. Native Bluetooth permissions\n3. react-native-ble-manager properly linked\n\nFor now, I\'ll demonstrate with simulated nearby devices.',
+      [
+        { text: 'Cancel', style: 'cancel', onPress: () => setIsScanning(false) },
+        { text: 'Show Demo', onPress: () => simulateDeviceDiscovery() }
+      ]
+    );
   };
 
   const simulateDeviceDiscovery = () => {
-    // Fallback simulation for when native scanning isn't available
+    // Simulate discovering real-looking devices
     const simulatedDevices: BluetoothDevice[] = [
       {
-        id: 'sim-iphone',
-        name: 'iPhone 15 Pro',
-        rssi: -42,
-        advertising: { localName: 'iPhone' }
+        id: 'iphone-12-pro',
+        name: 'iPhone 12 Pro',
+        rssi: -45,
+        advertising: { localName: 'iPhone 12 Pro' }
       },
       {
-        id: 'sim-airpods',
+        id: 'airpods-pro',
         name: 'AirPods Pro',
-        rssi: -35,
-        advertising: { localName: 'AirPods' }
+        rssi: -38,
+        advertising: { localName: 'AirPods Pro' }
       },
       {
-        id: 'sim-watch',
-        name: 'Apple Watch Ultra',
-        rssi: -48,
+        id: 'apple-watch',
+        name: 'Apple Watch Series 8',
+        rssi: -52,
         advertising: { localName: 'Apple Watch' }
       },
       {
-        id: 'sim-golf-ball',
-        name: 'Smart Golf Ball Pro',
+        id: 'golf-ball-tracker',
+        name: 'Smart Golf Ball',
         rssi: -65,
-        advertising: { localName: 'Golf Equipment' }
+        advertising: { localName: 'Golf Ball Tracker' }
+      },
+      {
+        id: 'samsung-galaxy',
+        name: 'Galaxy S23',
+        rssi: -48,
+        advertising: { localName: 'Samsung Galaxy' }
       }
     ];
 
+    // Simulate gradual device discovery
     simulatedDevices.forEach((device, index) => {
       setTimeout(() => {
         setDevices(prev => [...prev, device]);
-        console.log(`📱 Device discovered: ${device.name} (${device.rssi}dBm)`);
+        console.log(`📱 Simulated device discovered: ${device.name} (${device.rssi}dBm)`);
         
         if (index === simulatedDevices.length - 1) {
           setTimeout(() => setIsScanning(false), 1000);
         }
-      }, (index + 1) * 1200);
+      }, (index + 1) * 1500);
     });
   };
 
@@ -204,6 +174,7 @@ export function useBluetooth() {
     if (Platform.OS === 'web') {
       setIsBluetoothEnabled('bluetooth' in navigator);
     } else {
+      // For native platforms, assume Bluetooth is available
       setIsBluetoothEnabled(true);
     }
   };
@@ -218,5 +189,3 @@ export function useBluetooth() {
     scanError,
   };
 }
-
-export { useBluetooth }
