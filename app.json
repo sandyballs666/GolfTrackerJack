@@ -42,15 +42,7 @@
       "expo-font", 
       "expo-web-browser",
       "expo-location",
-      "expo-dev-client",
-      [
-        "react-native-ble-manager",
-        {
-          "isBackgroundEnabled": true,
-          "modes": ["peripheral", "central"],
-          "bluetoothAlwaysUsageDescription": "This app uses Bluetooth to discover and track nearby devices like golf balls, phones, and accessories."
-        }
-      ]
+      "expo-dev-client"
     ],
     "experiments": {
       "typedRoutes": true
