@@ -2,13 +2,16 @@ import { useState, useEffect } from 'react';
 import { Platform, PermissionsAndroid, Alert } from 'react-native';
 import { BluetoothDevice } from './useBluetooth';
 
-// Import BleManager only on native platforms
+// Only import BleManager on native platforms and in development builds
 let BleManager: any = null;
 if (Platform.OS !== 'web') {
   try {
-    BleManager = require('react-native-ble-manager');
+    // Only attempt to import in development builds
+    if (__DEV__) {
+      BleManager = require('react-native-ble-manager');
+    }
   } catch (error) {
-    console.log('react-native-ble-manager not available');
+    console.log('react-native-ble-manager not available in this build');
   }
 }
 
@@ -21,13 +24,15 @@ export function useNativeBluetooth() {
   useEffect(() => {
     if (Platform.OS !== 'web' && BleManager) {
       initializeBluetooth();
+    } else if (Platform.OS !== 'web') {
+      setScanError('Development build required for native Bluetooth scanning');
     }
   }, []);
 
   const initializeBluetooth = async () => {
     try {
       if (!BleManager) {
-        setScanError('react-native-ble-manager not installed');
+        setScanError('react-native-ble-manager not available in this build');
         return;
       }
 
@@ -133,7 +138,7 @@ export function useNativeBluetooth() {
 
   const startScan = async (): Promise<void> => {
     if (!BleManager) {
-      setScanError('react-native-ble-manager not available');
+      showDevelopmentBuildInstructions();
       return;
     }
 
@@ -166,6 +171,19 @@ export function useNativeBluetooth() {
       setScanError(`Scan failed: ${error.message}`);
       setIsScanning(false);
     }
+  };
+
+  const showDevelopmentBuildInstructions = () => {
+    Alert.alert(
+      '🛠️ Development Build Required',
+      'To scan for real Bluetooth devices on mobile:\n\n' +
+      '1. Install EAS CLI: npm install -g @expo/cli\n' +
+      '2. Run: eas build --profile development\n' +
+      '3. Install the generated APK/IPA on your device\n' +
+      '4. Open the app from the development build\n\n' +
+      'The development build includes react-native-ble-manager for real device scanning!',
+      [{ text: 'Got it!' }]
+    );
   };
 
   const stopScan = async (): Promise<void> => {
