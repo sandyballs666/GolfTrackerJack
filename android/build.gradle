@@ -5,10 +5,10 @@ buildscript {
         compileSdkVersion = 34
         targetSdkVersion = 34
         ndkVersion = "25.1.8937393"
-        kotlinVersion = "1.9.10"
+        kotlinVersion = "1.8.22"
     }
     dependencies {
-        classpath("com.android.tools.build:gradle:8.6.1")
+        classpath("com.android.tools.build:gradle:8.1.4")
         classpath("com.facebook.react:react-native-gradle-plugin")
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
         classpath("de.undercouch:gradle-download-task:5.0.1")
@@ -64,5 +64,7 @@ configurations.all {
         force 'androidx.appcompat:appcompat:1.6.1'
         force 'androidx.fragment:fragment:1.6.2'
         force 'androidx.activity:activity:1.8.2'
+        force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
+        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
     }
 }
