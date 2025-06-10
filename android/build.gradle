@@ -5,7 +5,7 @@ buildscript {
         compileSdkVersion = 33
         targetSdkVersion = 33
         ndkVersion = "25.1.8937393"
-        kotlinVersion = "1.7.22"
+        kotlinVersion = "1.8.10"
     }
     dependencies {
         classpath("com.android.tools.build:gradle:7.4.2")
@@ -64,7 +64,7 @@ configurations.all {
         force 'androidx.appcompat:appcompat:1.5.4'
         force 'androidx.fragment:fragment:1.5.5'
         force 'androidx.activity:activity:1.6.1'
-        force 'org.jetbrains.kotlin:kotlin-stdlib:1.7.22'
-        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'
+        force "org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion"
+        force "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion"
     }
 }

@@ -114,6 +114,11 @@ android {
 
     kotlinOptions {
         jvmTarget = "11"
+        freeCompilerArgs += [
+            "-Xno-param-assertions",
+            "-Xno-call-assertions",
+            "-Xno-receiver-assertions"
+        ]
     }
 
     buildFeatures {
@@ -145,13 +150,6 @@ dependencies {
         implementation jscFlavor
     }
 
-    // Expo modules
-    implementation project(':expo-modules-core')
-    implementation project(':expo-dev-client')
-
-    // React Native BLE Manager
-    implementation project(':react-native-ble-manager')
-
     // Other dependencies
     implementation 'androidx.appcompat:appcompat:1.5.4'
     implementation 'androidx.core:core-ktx:1.9.0'
@@ -159,8 +157,8 @@ dependencies {
     implementation 'androidx.fragment:fragment-ktx:1.5.5'
     
     // Kotlin standard library
-    implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.7.22'
-    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'
+    implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.8.10'
+    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.10'
 }
 
 apply from: new File(["node", "--print", "require.resolve('@react-native-community/cli-platform-android/package.json', { paths: [require.resolve('react-native/package.json')] })"].execute(null, rootDir).text.trim(), "../native_modules.gradle");
