@@ -1,14 +1,14 @@
 buildscript {
     ext {
-        buildToolsVersion = "34.0.0"
+        buildToolsVersion = "33.0.0"
         minSdkVersion = 23
-        compileSdkVersion = 34
-        targetSdkVersion = 34
+        compileSdkVersion = 33
+        targetSdkVersion = 33
         ndkVersion = "25.1.8937393"
-        kotlinVersion = "1.8.22"
+        kotlinVersion = "1.7.22"
     }
     dependencies {
-        classpath("com.android.tools.build:gradle:8.0.2")
+        classpath("com.android.tools.build:gradle:7.4.2")
         classpath("com.facebook.react:react-native-gradle-plugin")
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
         classpath("de.undercouch:gradle-download-task:5.0.1")
@@ -59,12 +59,12 @@ allprojects {
 // Force resolve to specific versions to avoid conflicts
 configurations.all {
     resolutionStrategy {
-        force 'androidx.core:core:1.12.0'
-        force 'androidx.core:core-ktx:1.12.0'
-        force 'androidx.appcompat:appcompat:1.6.1'
-        force 'androidx.fragment:fragment:1.6.2'
-        force 'androidx.activity:activity:1.8.2'
-        force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
-        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22'
+        force 'androidx.core:core:1.9.0'
+        force 'androidx.core:core-ktx:1.9.0'
+        force 'androidx.appcompat:appcompat:1.5.4'
+        force 'androidx.fragment:fragment:1.5.5'
+        force 'androidx.activity:activity:1.6.1'
+        force 'org.jetbrains.kotlin:kotlin-stdlib:1.7.22'
+        force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.7.22'
     }
 }
