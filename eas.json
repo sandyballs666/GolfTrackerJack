@@ -12,6 +12,9 @@
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleDebug"
+      },
+      "env": {
+        "NODE_ENV": "development"
       }
     },
     "preview": {
@@ -27,6 +30,9 @@
     "production": {
       "ios": {
         "resourceClass": "m-medium"
+      },
+      "android": {
+        "buildType": "aab"
       }
     }
   },

@@ -10,10 +10,24 @@ export function useNativeBluetooth() {
 
   useEffect(() => {
     if (Platform.OS !== 'web') {
-      // For now, we'll show instructions for development build
-      setScanError('Development build required for native Bluetooth scanning');
+      // Check if we're in a development build
+      checkDevelopmentBuild();
     }
   }, []);
+
+  const checkDevelopmentBuild = () => {
+    // In a development build, react-native-ble-manager would be available
+    // For now, we'll simulate this check
+    const isDevelopmentBuild = false; // This would be true in an actual dev build
+    
+    if (!isDevelopmentBuild) {
+      setScanError('Development build required for native Bluetooth scanning');
+      setIsBluetoothEnabled(false);
+    } else {
+      setIsBluetoothEnabled(true);
+      setScanError(null);
+    }
+  };
 
   const showDevelopmentBuildInstructions = () => {
     Alert.alert(
