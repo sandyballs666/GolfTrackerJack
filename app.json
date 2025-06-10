@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
@@ -42,7 +42,15 @@
       "expo-font", 
       "expo-web-browser",
       "expo-location",
-      "expo-dev-client"
+      "expo-dev-client",
+      [
+        "react-native-ble-manager",
+        {
+          "isBackgroundEnabled": true,
+          "modes": ["peripheral", "central"],
+          "bluetoothAlwaysUsageDescription": "This app uses Bluetooth to discover and track nearby devices like golf balls, phones, and accessories."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
